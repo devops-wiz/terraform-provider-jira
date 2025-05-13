@@ -1,0 +1,94 @@
+# Copyright (c) HashiCorp, Inc.
+
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  delve:
+    aliases:
+      - dlv
+      - debug
+      - dbg
+    desc: Starts dlv debug session to attach terraform repo to.
+    cmd: dlv debug --headless --continue --listen=127.0.0.1:60040 --api-version=2 --accept-multiclient -- -debug
+
+  gen:
+    aliases:
+      - g
+    cmd: go generate ./...
+    desc: run 'go generate'
+
+  fmt:
+    cmd: go fmt ./...
+    desc: Runs `go fmt ./...`
+
+  build:
+    aliases:
+      - b
+      - bld
+
+    desc: Go Build check
+
+    cmds:
+      - defer: rm ./tempbuild
+      - go build -o tempbuild
+
+  lint:
+    aliases:
+      - l
+      - lt
+    desc: Lints project using golangci-lint
+    cmd: golangci-lint run
+
+  install:
+    desc: Installs project binary in $GOBIN for local use
+    aliases:
+      - ins
+      - i
+    cmd: go install .
+
+
+  test:
+    desc: For running go tests, both unit and acceptance tests
+    vars:
+      VRBS:
+        ref: .VRBS  | default "false" | regexMatch "^(?i)(true|t)$"
+      FORMAT: '{{if .VRBS}}testname{{else}}pkgname{{end}} '
+      CTC:
+        ref: .CTC | default "false" | regexMatch "^(?i)(true|t)$"
+      TEST_CMD:
+        #   TODO: format pkgname is default, look into using gotestdox for gotestsum format
+        sh: |
+          if command -v "gotestsum" &> /dev/null; then
+            echo "gotestsum --rerun-fails --packages="./..." --format {{.FORMAT}} --hide-summary=skipped"
+          else
+            echo "go test{{if .VRBS}} -v{{end}}"
+          fi
+      RUN_PATTERN:
+        ref: .RUN_PATTERN | default "none"
+      ACC_ONLY:
+        ref: .ACC_ONLY | default "false" | regexMatch "^(?i)(true|t)$"
+      ACC:
+        ref: .ACC | default "false" | regexMatch "^(?i)(true|t)$" | or .ACC_ONLY
+
+
+
+    dotenv:
+      - .env
+    env:
+      TF_ACC: '{{if .ACC}}1{{end}}'
+
+    cmds:
+      - cmd: |
+          {{if .CTC}}go clean -testcache{{end}}
+        silent: true
+      - cmd: echo "ACC set to {{.ACC}}, {{if .ACC}}running{{else}}skipping{{end}} acceptance tests."
+        silent: true
+      - |
+        {{.TEST_CMD}} ./...
+        {{- if ne .RUN_PATTERN "none"}} -run ".RUN_PATTERN"{{end -}}
+        {{- if .ACC_ONLY}} -run TestAcc*{{end -}}
+      
+
+
