@@ -1,4 +1,4 @@
-# Copyright (c) HashiCorp, Inc.
+
 
 # https://taskfile.dev
 
@@ -48,6 +48,27 @@ tasks:
       - i
     cmd: go install .
 
+
+  gen-scaffold:
+
+    vars:
+      TYPE:
+        ref: .TYPE | default "resource"
+
+    requires:
+      vars:
+        - NAME
+        - name: TYPE
+          enum:
+            - resource
+            - data-source
+            - provider
+
+    aliases:
+      - gs
+
+    cmd: | 
+      tfplugingen-framework scaffold {{.TYPE}} --name {{.NAME}} --output-dir internal/provider
 
   test:
     desc: For running go tests, both unit and acceptance tests
