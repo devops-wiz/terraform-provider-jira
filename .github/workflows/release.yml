@@ -34,40 +34,25 @@ jobs:
       newTag: ${{ steps.tag_version.outputs.new_tag }}
       release: ${{ steps.tag_version.outputs.release_type != ''}}
 
-  changelog_gen:
-    name: CHANGELOG.MD automatic update
-    if: needs.version_tagging.outputs.release
+
+
+  goreleaser:
+    name: Release with GoReleaser
     needs: version_tagging
     runs-on: ubuntu-latest
+    if: needs.version_tagging.outputs.release
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           # Allow goreleaser to access older tag information.
           fetch-depth: 0
-      - id: changelog
+      - name: Update Changelog
+        id: changelog
         uses: requarks/changelog-action@v1.10.2
         with:
           token: ${{ SECRETS.GITHUB_TOKEN }}
           tag: ${{ needs.version_tagging.outputs.newTag }}
-      - uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          branch: main
-          commit_message: 'docs: update CHANGELOG.md for ${{ github.ref_name }} [skip ci]'
-          file_pattern: CHANGELOG.md
-
-    outputs:
-      release: ${{ needs.version_tagging.outputs.release }}
-
-  goreleaser:
-    name: Release with GoReleaser
-    needs: changelog_gen
-    runs-on: ubuntu-latest
-    if: needs.changelog_gen.outputs.release
-    steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          # Allow goreleaser to access older tag information.
-          fetch-depth: 0
+          writeToFile: true
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: "go.mod"
@@ -86,3 +71,13 @@ jobs:
           # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+      - name: Commit changelog
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          branch: 'chore/changelog-update-${{ needs.version_tagging.outputs.newTag }}'
+          commit_message: 'docs: update CHANGELOG.md for ${{ github.ref_name }} [skip ci]'
+          file_pattern: CHANGELOG.md
+      - uses: peter-evans/create-pull-request@v7.0.8
+        with:
+          branch: 'chore/changelog-update-${{ needs.version_tagging.outputs.newTag }}'
+          delete-branch: true
