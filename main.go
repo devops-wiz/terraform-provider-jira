@@ -15,14 +15,11 @@ import (
 var (
 	// these will be set by the goreleaser configuration
 	// to appropriate values for the compiled binary.
-	version string = "dev"
+	version = "dev"
 
 	// goreleaser can pass other information to the main package, such as the specific commit
 	// https://goreleaser.com/cookbooks/using-main.version/
 )
-
-// Generate copyright headers
-//go:generate go run github.com/hashicorp/copywrite headers -d . --config ./.copywrite.hcl
 
 // Format Terraform code for use in documentation.
 // If you do not have Terraform installed, you can remove the formatting command, but it is suggested
