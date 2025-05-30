@@ -1,7 +1,7 @@
 
 
 # Terraform Provider release workflow.
-name: Release
+name: Versioning and Release
 
 # This GitHub action creates a release when a tag that matches the pattern
 # "v*" (e.g. v0.1.0) is created.
@@ -16,8 +16,8 @@ permissions:
   contents: write
 
 jobs:
-  tag_release:
-    name: Tag and Release
+  version_tagging:
+    name: Version and Tag
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -30,6 +30,37 @@ jobs:
         with:
           default_bump: false
           github_token: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      newTag: ${{ steps.tag_version.outputs.new_tag }}
+      release: ${{ steps.tag_version.outputs.release_type != ''}}
+
+  changelog_gen:
+    name: CHANGELOG.MD automatic update
+    needs: version_tagging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          # Allow goreleaser to access older tag information.
+          fetch-depth: 0
+      - id: changelog
+        uses: requarks/changelog-action@v1.10.2
+        with:
+          token: ${{ SECRETS.GITHUB_TOKEN }}
+          tag: ${{ needs.version_tagging.outputs.newTag }}
+    outputs:
+      release: ${{ needs.version_tagging.outputs.release }}
+
+  goreleaser:
+    name: Release with GoReleaser
+    needs: changelog_gen
+    runs-on: ubuntu-latest
+    if: needs.changelog_gen.outputs.release
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          # Allow goreleaser to access older tag information.
+          fetch-depth: 0
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: "go.mod"
@@ -43,7 +74,7 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@7ec5c2b0c6cdda6e8bbb49444bc797dd33d74dd8 # v5.0.0
         with:
-          args: release --clean
+          args: release --clean --release-notes CHANGELOG.MD
         env:
           # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
