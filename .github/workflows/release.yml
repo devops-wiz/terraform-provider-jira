@@ -36,6 +36,7 @@ jobs:
 
   changelog_gen:
     name: CHANGELOG.MD automatic update
+    if: needs.version_tagging.outputs.newTag!=''
     needs: version_tagging
     runs-on: ubuntu-latest
     steps:
