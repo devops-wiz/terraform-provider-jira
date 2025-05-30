@@ -5,6 +5,13 @@
 version: '3'
 
 tasks:
+
+  default:
+    desc: Default command chain to run before commiting.
+
+    cmds:
+
+
   delve:
     aliases:
       - dlv
@@ -20,8 +27,8 @@ tasks:
     desc: run 'go generate'
 
   fmt:
-    cmd: go fmt ./...
-    desc: Runs `go fmt ./...`
+    cmd: gofmt -s -w -e .
+    desc: Runs builtin Go Format command
 
   build:
     aliases:
@@ -32,7 +39,7 @@ tasks:
 
     cmds:
       - defer: rm ./tempbuild
-      - go build -o tempbuild
+      - go build -o tempbuild -v ./...
 
   lint:
     aliases:
@@ -46,11 +53,10 @@ tasks:
     aliases:
       - ins
       - i
-    cmd: go install .
+    cmd: go install -v ./...
 
 
   gen-scaffold:
-
     vars:
       TYPE:
         ref: .TYPE | default "resource"
@@ -70,9 +76,19 @@ tasks:
     cmd: | 
       tfplugingen-framework scaffold {{.TYPE}} --name {{.NAME}} --output-dir internal/provider
 
+
+  update-changelog:
+    aliases:
+      - uc
+      - changelog
+      - cl
+    desc: Updated CHANGELOG.MD
+
   test:
     desc: For running go tests, both unit and acceptance tests
     vars:
+      COVER:
+        ref: .COVER | default "false" | regexMatch "^(?i)(true|t)$"
       VRBS:
         ref: .VRBS  | default "false" | regexMatch "^(?i)(true|t)$"
       FORMAT: '{{if .VRBS}}testname{{else}}pkgname{{end}} '
@@ -108,6 +124,7 @@ tasks:
         silent: true
       - |
         {{.TEST_CMD}} ./...
+        {{- if .COVER}} -cover{{end -}}
         {{- if ne .RUN_PATTERN "none"}} -run ".RUN_PATTERN"{{end -}}
         {{- if .ACC_ONLY}} -run TestAcc*{{end -}}
       
