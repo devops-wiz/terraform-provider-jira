@@ -5,7 +5,8 @@ package provider
 
 import (
 	"context"
-	"github.com/andygrunwald/go-jira"
+	"fmt"
+	jira "github.com/ctreminiom/go-atlassian/v2/jira/v3"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -34,9 +35,10 @@ type JiraProvider struct {
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
-
-	// client represents an instance of the Jira client used to interact with the Jira API.
-	client jira.Client
+	// client is the Jira client.
+	client *jira.Client
+	// premium is whether the Jira instance is premium.
+	premium bool
 }
 
 // JiraProviderModel describes the provider data model.
@@ -45,6 +47,8 @@ type JiraProviderModel struct {
 	Endpoint types.String `tfsdk:"endpoint"`
 
 	AuthMethod types.String `tfsdk:"auth_method"`
+
+	Premium types.Bool `tfsdk:"premium"`
 
 	// API Token Authentication
 	APIToken     types.String `tfsdk:"api_token"`
@@ -55,19 +59,19 @@ type JiraProviderModel struct {
 	Password types.String `tfsdk:"password"`
 }
 
-func (j *JiraProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (j *JiraProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "jira"
 	resp.Version = j.version
 }
 
-func (j *JiraProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (j *JiraProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Jira provider for interacting with Jira instances using the go-jira library.",
 		Attributes: map[string]schema.Attribute{
 			// Base Configuration
 			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Base Endpoint of the Jira instance (e.g., 'https://your-domain.atlassian.net').",
-				Required:            true,
+				MarkdownDescription: "Base Endpoint of the Jira client (e.g., 'https://your-domain.atlassian.net').",
+				Optional:            true,
 			},
 
 			"auth_method": schema.StringAttribute{
@@ -76,6 +80,11 @@ func (j *JiraProvider) Schema(ctx context.Context, req provider.SchemaRequest, r
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`(api_token|basic|^$)`), "auth_method must be one of 'api_token' or 'basic'."),
 				},
+			},
+
+			"premium": schema.BoolAttribute{
+				MarkdownDescription: "Whether the Jira instance is premium. Defaults to false.",
+				Optional:            true,
 			},
 
 			// API Token Authentication (Recommended for Jira Cloud)
@@ -161,11 +170,20 @@ func (j *JiraProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
+	if !data.Premium.IsNull() {
+		j.premium = data.Premium.ValueBool()
+	}
+
+	client, err := jira.New(nil, endpoint)
+
+	if err != nil {
+		resp.Diagnostics.AddError("Error creating Jira client", err.Error())
+		return
+	}
+
 	if data.AuthMethod.IsNull() {
 		data.AuthMethod = types.StringValue("api_token")
 	}
-
-	var tp jira.BasicAuthTransport
 
 	switch data.AuthMethod.ValueString() {
 	case "api_token":
@@ -192,10 +210,7 @@ func (j *JiraProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			return
 		}
 
-		tp = jira.BasicAuthTransport{
-			Username: email,
-			Password: apiToken,
-		}
+		client.Auth.SetBasicAuth(email, apiToken)
 	case "basic":
 		if !data.Username.IsNull() {
 			username = data.Username.ValueString()
@@ -219,10 +234,7 @@ func (j *JiraProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			return
 		}
 
-		tp = jira.BasicAuthTransport{
-			Username: username,
-			Password: password,
-		}
+		client.Auth.SetBasicAuth(username, password)
 	default:
 		resp.Diagnostics.AddError("Invalid Auth Method Configuration.", "While configuring the provider, "+
 			"the auth_method was not found in "+
@@ -231,31 +243,30 @@ func (j *JiraProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	// Create the client
-	client, err := jira.NewClient(tp.Client(), endpoint)
-	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jira client", err.Error())
-		return
-	}
-
-	// Store the client
-	j.client = *client
+	client.Auth.SetUserAgent("devops-wiz/terraform-provider-jira")
 
 	// Test the connection
-	_, _, err = client.User.GetSelf()
+	_, apiResp, err := client.MySelf.Details(ctx, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error connecting to Jira",
-			"Failed to authenticate with Jira: "+err.Error())
+			fmt.Sprintf("Failed to authenticate with Jira:\nError: %s\nCode: %d", err.Error(), apiResp.StatusCode))
 		return
 	}
 
+	j.client = client
+
+	resp.ResourceData = j
+	resp.DataSourceData = j
+
 }
 
-func (j *JiraProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+func (j *JiraProvider) Resources(_ context.Context) []func() resource.Resource {
+	return []func() resource.Resource{
+		NewWorkTypeResource,
+	}
 }
 
-func (j *JiraProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+func (j *JiraProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{}
 }
 
