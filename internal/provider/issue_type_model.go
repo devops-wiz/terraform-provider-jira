@@ -15,9 +15,6 @@ type issueTypeResourceModel struct {
 	Subtask        types.Bool   `tfsdk:"subtask"`
 	AvatarID       types.Int64  `tfsdk:"avatar_id"`
 	HierarchyLevel types.Int32  `tfsdk:"hierarchy_level"`
-	// Scope related fields
-	ScopeType      types.String `tfsdk:"scope_type"`
-	ScopeProjectId types.String `tfsdk:"scope_project_id"`
 }
 
 func (i *issueTypeResourceModel) GetApiPayload(_ context.Context) (createPayload *models.IssueTypePayloadScheme, diags diag.Diagnostics) {
@@ -41,11 +38,6 @@ func (i *issueTypeResourceModel) TransformToState(_ context.Context, issueType *
 		Subtask:        types.BoolValue(issueType.Subtask),
 		AvatarID:       types.Int64Value(int64(issueType.AvatarID)),
 		HierarchyLevel: types.Int32Value(int32(issueType.HierarchyLevel)),
-	}
-
-	if issueType.Scope != nil {
-		i.ScopeType = types.StringValue(issueType.Scope.Type)
-		i.ScopeProjectId = types.StringValue(issueType.Scope.Project.ID)
 	}
 
 	return nil

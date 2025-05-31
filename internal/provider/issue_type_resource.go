@@ -5,8 +5,6 @@ import (
 	"fmt"
 	jira "github.com/ctreminiom/go-atlassian/v2/jira/v3"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
@@ -16,7 +14,6 @@ import (
 )
 
 var _ resource.Resource = (*issueTypeResource)(nil)
-var _ resource.ResourceWithValidateConfig = (*issueTypeResource)(nil)
 var _ resource.ResourceWithConfigure = (*issueTypeResource)(nil)
 var _ resource.ResourceWithImportState = (*issueTypeResource)(nil)
 
@@ -49,32 +46,6 @@ func (r *issueTypeResource) Configure(_ context.Context, req resource.ConfigureR
 	}
 
 	r.client = client
-}
-
-func (r *issueTypeResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data issueTypeResourceModel
-
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	// Validate config data here
-	if data.ScopeType.IsNull() {
-		return
-	}
-
-	scopeType := data.ScopeType.ValueString()
-
-	if scopeType == "GLOBAL" && !data.ScopeProjectId.IsNull() {
-		resp.Diagnostics.AddAttributeError(path.Root("scope_project_id"), "Cannot set scope_project_id when scope_type is GLOBAL.", "scope_project_id is only valid when scope_type is set to PROJECT.")
-		return
-	}
-
-	if scopeType == "PROJECT" && data.ScopeProjectId.IsNull() {
-		resp.Diagnostics.AddAttributeError(path.Root("scope_project_id"), "Missing scope_project_id.", "scope_project_id is required when scope_type is set to PROJECT.")
-		return
-	}
 }
 
 func (r *issueTypeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -118,17 +89,6 @@ func (r *issueTypeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					int32validator.OneOf(0, -1),
 				},
 				MarkdownDescription: "The hierarchy level of the issue type, which defines its position in hierarchical structures. Typically `0` for regular issues and `1` for subtasks. Defaults to 0",
-			},
-			"scope_type": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "The scope of the issue type. Valid values are `GLOBAL` (available to all projects) or `PROJECT` (restricted to specific projects).",
-				Validators: []validator.String{
-					stringvalidator.OneOf("GLOBAL", "PROJECT"),
-				},
-			},
-			"scope_project_id": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "The ID of the project to which this issue type is scoped. Required when `scope_type` is set to `PROJECT`. This limits the issue type to be available only in the specified project.",
 			},
 		},
 	}
