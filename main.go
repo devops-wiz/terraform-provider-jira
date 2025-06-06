@@ -27,6 +27,7 @@ var (
 //go:generate terraform fmt -recursive ./examples/
 
 // Generate documentation.
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs validate -provider-name jira
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate -provider-name jira
 
 func main() {

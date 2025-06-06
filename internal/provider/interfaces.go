@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
-	datasrcSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
 
 type ApiPayloadGetter[P any] interface {
@@ -26,14 +24,6 @@ type IDer interface {
 type ResourceTransformer[P, R any] interface {
 	ApiPayloadGetter[P]
 	TerraformTransformer[R]
-}
-
-type ResourceSchemaGetter interface {
-	GetSchema() resourceSchema.Schema
-}
-
-type DataSourceSchemaGetter interface {
-	GetSchema() datasrcSchema.Schema
 }
 
 func CreateResource[C, R any](ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse, resourceModel ResourceTransformer[C, R], createFunc func(ctx context.Context, newResource C) (R, *models.ResponseScheme, error)) {
@@ -88,6 +78,7 @@ func ReadResource[R any](ctx context.Context, request resource.ReadRequest, resp
 
 	if apiResp.StatusCode != 200 {
 		response.Diagnostics.AddError("Error reading resource", fmt.Sprintf("Error:\n%s", apiResp.Body))
+		return
 	}
 
 	response.Diagnostics.Append(resourceModel.TransformToState(ctx, resourceResp)...)

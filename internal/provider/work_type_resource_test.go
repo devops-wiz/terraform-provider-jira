@@ -1,7 +1,8 @@
 package provider
 
 import (
-	"fmt"
+	"bytes"
+	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
@@ -9,27 +10,31 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"testing"
+	"text/template"
 )
 
-var (
-	standardIssueType = 0
-	subtaskIssueType  = -1
-)
+const defaultWorkTypeDescription = "Default Work Type Description"
 
-func TestAccIssueTypeResource_basic(t *testing.T) {
+var baseWorkType = models.IssueTypePayloadScheme{
+	Description: defaultWorkTypeDescription,
+}
+
+func TestAccWorkTypeResource_basic(t *testing.T) {
 	t.Parallel()
 	rName := "jira_work_type.test"
 
-	t.Run("create standard work type with hierarchy_level default", func(t *testing.T) {
+	t.Run("create standard work type with empty description", func(t *testing.T) {
 		t.Parallel()
-		resourceName := acctest.RandomWithPrefix("tfacc-issue-type")
+		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
+		workType := baseWorkType
+		workType.Name = resourceName
+		workType.Description = ""
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-
 			Steps: []resource.TestStep{
 				{
-					Config: testAccIssueTypeResourceConfig(t, resourceName, "Test work type", nil),
+					Config: testAccWorkTypeResourceConfig(t, workType),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(resourceName)),
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("hierarchy_level"), knownvalue.Int32Exact(0)),
@@ -38,16 +43,39 @@ func TestAccIssueTypeResource_basic(t *testing.T) {
 			},
 		})
 	})
-	t.Run("create standard work type with hierarchy_level set", func(t *testing.T) {
+
+	t.Run("create standard work type with hierarchy_level default", func(t *testing.T) {
 		t.Parallel()
-		resourceName := acctest.RandomWithPrefix("tfacc-issue-type")
+		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
+		workType := baseWorkType
+		workType.Name = resourceName
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-
 			Steps: []resource.TestStep{
 				{
-					Config: testAccIssueTypeResourceConfig(t, resourceName, "Test work type", &standardIssueType),
+					Config: testAccWorkTypeResourceConfig(t, workType),
+					ConfigStateChecks: []statecheck.StateCheck{
+						statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(resourceName)),
+						statecheck.ExpectKnownValue(rName, tfjsonpath.New("hierarchy_level"), knownvalue.Int32Exact(0)),
+					},
+				},
+			},
+		})
+	})
+
+	t.Run("create standard work type with hierarchy_level set", func(t *testing.T) {
+		t.Parallel()
+		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
+		workType := baseWorkType
+		workType.Name = resourceName
+		workType.HierarchyLevel = standardWorkType
+		resource.Test(t, resource.TestCase{
+			PreCheck:                 func() { testAccPreCheck(t) },
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+			Steps: []resource.TestStep{
+				{
+					Config: testAccWorkTypeResourceConfig(t, workType),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(resourceName)),
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("hierarchy_level"), knownvalue.Int32Exact(0)),
@@ -59,14 +87,16 @@ func TestAccIssueTypeResource_basic(t *testing.T) {
 
 	t.Run("create subtask work type", func(t *testing.T) {
 		t.Parallel()
-		resourceName := acctest.RandomWithPrefix("tfacc-issue-type")
+		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
+		workType := baseWorkType
+		workType.Name = resourceName
+		workType.HierarchyLevel = subtaskWorkType
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-
 			Steps: []resource.TestStep{
 				{
-					Config: testAccIssueTypeResourceConfig(t, resourceName, "Test work type", &subtaskIssueType),
+					Config: testAccWorkTypeResourceConfig(t, workType),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(resourceName)),
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("hierarchy_level"), knownvalue.Int32Exact(-1)),
@@ -78,34 +108,40 @@ func TestAccIssueTypeResource_basic(t *testing.T) {
 
 }
 
-func TestAccIssueTypeResource_update(t *testing.T) {
+func TestAccWorkTypeResource_update(t *testing.T) {
 	t.Parallel()
 	rName := "jira_work_type.test"
 
 	t.Run("update an work type description and import", func(t *testing.T) {
 		t.Parallel()
-		resourceName := acctest.RandomWithPrefix("tfacc-issue-type")
+		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
+		workType := baseWorkType
+		workType.Name = resourceName
+		workType.HierarchyLevel = standardWorkType
+		workTypeChanged := workType
+		updatedDescription := "Updated Work Type Description"
+		workTypeChanged.Description = updatedDescription
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-
 			Steps: []resource.TestStep{
 				{
-					Config: testAccIssueTypeResourceConfig(t, resourceName, "Test work type", nil),
+					Config: testAccWorkTypeResourceConfig(t, workType),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(resourceName)),
+						statecheck.ExpectKnownValue(rName, tfjsonpath.New("description"), knownvalue.StringExact(defaultWorkTypeDescription)),
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("hierarchy_level"), knownvalue.Int32Exact(0)),
 					},
 				},
 				{
-					Config: testAccIssueTypeResourceConfig(t, resourceName, "Test work type 2", nil),
+					Config: testAccWorkTypeResourceConfig(t, workTypeChanged),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(resourceName)),
+						statecheck.ExpectKnownValue(rName, tfjsonpath.New("description"), knownvalue.StringExact(updatedDescription)),
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("hierarchy_level"), knownvalue.Int32Exact(0)),
 					},
 				},
 				{
-					// Test Step 3: import mode
 					ImportState:     true,
 					ImportStateKind: resource.ImportBlockWithID,
 					ResourceName:    rName,
@@ -115,21 +151,25 @@ func TestAccIssueTypeResource_update(t *testing.T) {
 	})
 	t.Run("recreate when changing Hierarchy level", func(t *testing.T) {
 		t.Parallel()
-		resourceName := acctest.RandomWithPrefix("tfacc-issue-type")
+		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
+		workType := baseWorkType
+		workType.Name = resourceName
+		workType.HierarchyLevel = standardWorkType
+		workTypeChanged := workType
+		workTypeChanged.HierarchyLevel = subtaskWorkType
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-
 			Steps: []resource.TestStep{
 				{
-					Config: testAccIssueTypeResourceConfig(t, resourceName, "Test work type", &standardIssueType),
+					Config: testAccWorkTypeResourceConfig(t, workType),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(resourceName)),
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("hierarchy_level"), knownvalue.Int32Exact(0)),
 					},
 				},
 				{
-					Config: testAccIssueTypeResourceConfig(t, resourceName, "Test work type 2", &subtaskIssueType),
+					Config: testAccWorkTypeResourceConfig(t, workTypeChanged),
 					ConfigPlanChecks: resource.ConfigPlanChecks{
 						PreApply: []plancheck.PlanCheck{
 							plancheck.ExpectResourceAction(rName, plancheck.ResourceActionReplace),
@@ -146,22 +186,20 @@ func TestAccIssueTypeResource_update(t *testing.T) {
 
 }
 
-func testAccIssueTypeResourceConfig(t *testing.T, name string, desc string, hierarchLvl *int) string {
+func testAccWorkTypeResourceConfig(t *testing.T, workType models.IssueTypePayloadScheme) string {
 	t.Helper()
-	if hierarchLvl == nil {
-		return fmt.Sprintf(`
-resource "jira_work_type" "test" {
-	name = "%s"
-	description = "%s"
-}
-`, name, desc)
-	} else {
-		return fmt.Sprintf(`
-resource "jira_work_type" "test" {
-	name = "%s"
-	description = "%s"
-	hierarchy_level = %d
-}
-`, name, desc, *hierarchLvl)
+	tmpl, err := template.New(workTypeTmpl).ParseFiles(workTypeTmplPath)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	var tfFile bytes.Buffer
+
+	err = tmpl.Execute(&tfFile, workType)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return tfFile.String()
 }

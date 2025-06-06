@@ -1,0 +1,40 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderShortName}}"
+description: |-
+  {{.Description}}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{.Description}}
+
+## Example Usage
+
+There are 3 ways to use {{.Name}} data source:
+*   With no arguments (return all work types)
+*   Using the `names` attribute to filter work types by name
+*   Using the `ids` attribute to filter work types by id
+
+### No Filtering
+
+```terraform
+data "jira_work_types" "example" {}
+```
+
+### Names Filtering
+
+```terraform
+data "jira_work_types" "example" {
+  names = ["Bug", "Story"]
+}
+```
+
+### Ids Filtering
+
+```terraform
+data "jira_work_types" "example" {
+  ids = ["10000", "10004"]
+}
+```
+
+{{.SchemaMarkdown}}

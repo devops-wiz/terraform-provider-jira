@@ -70,7 +70,7 @@ func (j *JiraProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp 
 		Attributes: map[string]schema.Attribute{
 			// Base Configuration
 			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Base Endpoint of the Jira client (e.g., 'https://your-domain.atlassian.net').",
+				MarkdownDescription: "Base Endpoint of the Jira client (e.g., 'https://your-domain.atlassian.net').Can be set with environment variable `JIRA_ENDPOINT`.",
 				Optional:            true,
 			},
 
@@ -83,28 +83,28 @@ func (j *JiraProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp 
 			},
 
 			"premium": schema.BoolAttribute{
-				MarkdownDescription: "Whether the Jira instance is premium. Defaults to false.",
+				MarkdownDescription: "Whether the Jira instance is premium. Premium instances will have additional features available. Defaults to false.",
 				Optional:            true,
 			},
 
 			// API Token Authentication (Recommended for Jira Cloud)
 			"api_token": schema.StringAttribute{
-				MarkdownDescription: "API token (PAT) for authentication. Required when using API token authentication with email.",
+				MarkdownDescription: "API token (PAT) for authentication. **Required** when using API token authentication with email.Can be set with environment variable `JIRA_API_TOKEN`.",
 				Optional:            true,
 				Sensitive:           true,
 			},
 			"api_auth_email": schema.StringAttribute{
-				MarkdownDescription: "Email address associated with the API token. Required when using API token authentication.",
+				MarkdownDescription: "Email address associated with the API token. **Required** when using API token authentication.Can be set with environment variable `JIRA_API_EMAIL`.",
 				Optional:            true,
 			},
 
 			// Basic Authentication (For self-hosted Jira)
 			"username": schema.StringAttribute{
-				MarkdownDescription: "Username for basic authentication. Required when using basic authentication with password.",
+				MarkdownDescription: "Username for basic authentication. **Required** when using basic authentication with password.Can be set with environment variable `JIRA_USERNAME`.",
 				Optional:            true,
 			},
 			"password": schema.StringAttribute{
-				MarkdownDescription: "Password for basic authentication. Required when using basic authentication.",
+				MarkdownDescription: "Password for basic authentication. **Required** when using basic authentication.Can be set with environment variable `JIRA_PASSWORD`.",
 				Optional:            true,
 				Sensitive:           true,
 			},
@@ -267,7 +267,9 @@ func (j *JiraProvider) Resources(_ context.Context) []func() resource.Resource {
 }
 
 func (j *JiraProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewWorkTypesDataSource,
+	}
 }
 
 func New(version string) func() provider.Provider {

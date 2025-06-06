@@ -1,0 +1,18 @@
+data "jira_work_types" "test" {
+    {{- if .Ids}}
+    ids = [
+        {{- range $index, $id := .Ids}}
+        {{- if $index}}{{","}}{{end}}
+        "{{$id}}"
+        {{- end}}
+    ]
+    {{- end}}
+    {{- if .Names}}
+    names = [
+        {{- range $index, $name := .Names}}
+        {{- if $index}}{{","}}{{end}}
+        "{{$name}}"
+        {{- end}}
+    ]
+    {{- end}}
+}
