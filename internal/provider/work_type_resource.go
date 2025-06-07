@@ -35,7 +35,7 @@ func (r *workTypeResource) Configure(_ context.Context, req resource.ConfigureRe
 		return
 	}
 
-	provider, ok := req.ProviderData.(JiraProvider)
+	provider, ok := req.ProviderData.(*JiraProvider)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -73,12 +73,6 @@ func (r *workTypeResource) ValidateConfig(ctx context.Context, req resource.Vali
 }
 
 func (r *workTypeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-
-	hierarchyDescription := "The level of the work type in the hierarchy. There are a few rules:\n" +
-		"* A value of -1 indicates the work type is a subtask.\n" +
-		"* A value of 0 indicates the work type is a standard level work type.\n" +
-		"* Epics have a hierarchy level of 1, and in Jira Premium, hierarchy can be expand beyond the epic level. " +
-		"In this case values above 0 and below -1 can be used."
 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Jira work type. Issue types are used to define the structure of different types of issues or work items in your Jira client.",

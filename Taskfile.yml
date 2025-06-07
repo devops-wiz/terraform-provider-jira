@@ -1,17 +1,8 @@
-
-
 # https://taskfile.dev
 
 version: '3'
 
 tasks:
-
-  default:
-    desc: Default command chain to run before commiting.
-
-    cmds:
-
-
   delve:
     aliases:
       - dlv
@@ -27,8 +18,8 @@ tasks:
     desc: run 'go generate'
 
   fmt:
-    cmd: gofmt -s -w -e .
-    desc: Runs builtin Go Format command
+    cmd: go fmt ./...
+    desc: Runs `go fmt ./...`
 
   build:
     aliases:
@@ -39,7 +30,7 @@ tasks:
 
     cmds:
       - defer: rm ./tempbuild
-      - go build -o tempbuild -v ./...
+      - go build -o tempbuild
 
   lint:
     aliases:
@@ -53,80 +44,59 @@ tasks:
     aliases:
       - ins
       - i
-    cmd: go install -v ./...
+    cmd: go install .
 
-
-  gen-scaffold:
-    vars:
-      TYPE:
-        ref: .TYPE | default "resource"
-
-    requires:
-      vars:
-        - NAME
-        - name: TYPE
-          enum:
-            - resource
-            - data-source
-            - provider
-
-    aliases:
-      - gs
-
-    cmd: | 
-      tfplugingen-framework scaffold {{.TYPE}} --name {{.NAME}} --output-dir internal/provider
-
-
-  update-changelog:
-    aliases:
-      - uc
-      - changelog
-      - cl
-    desc: Updated CHANGELOG.MD
 
   test:
     desc: For running go tests, both unit and acceptance tests
     vars:
-      COVER:
-        ref: .COVER | default "false" | regexMatch "^(?i)(true|t)$"
       VRBS:
         ref: .VRBS  | default "false" | regexMatch "^(?i)(true|t)$"
-      FORMAT: '{{if .VRBS}}testname{{else}}pkgname{{end}} '
+
+      GTS_FORMAT:
+        sh: |
+          if command -v "gotestdox" &> /dev/null; then
+            echo "testdox"
+          else
+            echo "testname"
+          fi
+      FORMAT: "{{if or .VRBS .V}}{{.GTS_FORMAT}}{{else}}pkgname{{end}}"
       CTC:
         ref: .CTC | default "false" | regexMatch "^(?i)(true|t)$"
       TEST_CMD:
-        #   TODO: format pkgname is default, look into using gotestdox for gotestsum format
         sh: |
           if command -v "gotestsum" &> /dev/null; then
-            echo "gotestsum --rerun-fails --packages="./..." --format {{.FORMAT}} --hide-summary=skipped"
+            echo "gotestsum --packages="./..." --format {{.FORMAT}} --hide-summary=skipped"
           else
-            echo "go test{{if .VRBS}} -v{{end}}"
+            echo "go test{{if or .VRBS .V}} -v{{end}}"
           fi
       RUN_PATTERN:
         ref: .RUN_PATTERN | default "none"
       ACC_ONLY:
         ref: .ACC_ONLY | default "false" | regexMatch "^(?i)(true|t)$"
       ACC:
-        ref: .ACC | default "false" | regexMatch "^(?i)(true|t)$" | or .ACC_ONLY
+        ref: .ACC | default "false" | regexMatch "^(?i)(true|t)$"
+      SWEEP:
+        ref: .SWEEP | default "false" | regexMatch "^(?i)(true|t)$"
 
 
 
     dotenv:
       - .env
     env:
-      TF_ACC: '{{if .ACC}}1{{end}}'
+      TF_ACC: '{{if or .ACC .ACC_ONLY}}1{{end}}'
 
     cmds:
       - cmd: |
           {{if .CTC}}go clean -testcache{{end}}
         silent: true
-      - cmd: echo "ACC set to {{.ACC}}, {{if .ACC}}running{{else}}skipping{{end}} acceptance tests."
+      - cmd: echo "ACC set to {{or .ACC .ACC_ONLY}}, {{if or .ACC .ACC_ONLY}}running{{else}}skipping{{end}} acceptance tests."
         silent: true
       - |
         {{.TEST_CMD}} ./...
-        {{- if .COVER}} -cover{{end -}}
         {{- if ne .RUN_PATTERN "none"}} -run ".RUN_PATTERN"{{end -}}
         {{- if .ACC_ONLY}} -run TestAcc*{{end -}}
-      
 
-
+  sweep:
+    dotenv: [.env]
+    cmd: go test ./internal/provider -test.v -args -sweep all
