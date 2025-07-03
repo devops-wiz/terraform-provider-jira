@@ -263,6 +263,7 @@ func (j *JiraProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 func (j *JiraProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewWorkTypeResource,
+		NewWorkflowStatusResource,
 	}
 }
 
