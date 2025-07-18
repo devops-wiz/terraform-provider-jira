@@ -3,7 +3,7 @@ module github.com/devops-wiz/terraform-provider-jira
 go 1.24.3
 
 require (
-	github.com/ctreminiom/go-atlassian/v2 v2.6.1
+	github.com/ctreminiom/go-atlassian/v2 v2.6.2
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
 	github.com/hashicorp/terraform-plugin-go v0.28.0
