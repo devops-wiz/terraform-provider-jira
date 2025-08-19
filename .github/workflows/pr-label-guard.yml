@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: MPL-2.0
+name: PR Label Guard
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  check-labels:
+    name: Ensure exactly one category label or skip-release-notes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = (context.payload.pull_request.labels || []).map(l => l.name);
+            const categories = new Set([
+              "type:feat",
+              "type:change","type:refactor","type:docs","type:chore","type:test",
+              "type:deprecated",
+              "type:breaking",
+              "type:fix",
+              "security"
+            ]);
+            const skip = new Set(["skip-release-notes","skip-changelog"]);
+
+            const catLabels = labels.filter(l => categories.has(l));
+            const catCount = catLabels.length;
+            const hasSkip = labels.some(l => skip.has(l));
+
+            // Log unknown/mistyped category labels to help contributors
+            const unknownType = labels.filter(l => l.startsWith("type:") && !categories.has(l));
+            if (unknownType.length > 0) {
+              core.warning(
+                "Unrecognized 'type:' label(s): " + unknownType.join(", ") + ". " +
+                "Use exactly one canonical category label: " +
+                "type:feat | type:change | type:refactor | type:docs | type:chore | type:test | type:deprecated | type:breaking | type:fix | security. " +
+                "Unrecognized labels are ignored by automation."
+              );
+            }
+
+            const allowedPrefixes = ["area:", "triage:"];
+            const allowedMisc = new Set(["release-note","breaking-change","ci:docs-only","ci:force-plugin-checks"]);
+            const ignored = labels.filter(l =>
+              !categories.has(l) &&
+              !skip.has(l) &&
+              !unknownType.includes(l) &&
+              !allowedPrefixes.some(p => l.startsWith(p)) &&
+              !allowedMisc.has(l)
+            );
+            if (ignored.length > 0) {
+              core.notice("Non-category label(s) not used by release notes automation: " + ignored.join(", "));
+            }
+
+            const ok = (hasSkip && catCount === 0) || (!hasSkip && catCount === 1);
+
+            if (!ok) {
+              core.setFailed(
+                "Label guard: apply exactly one canonical category label (type:*) OR apply 'skip-release-notes'.\n" +
+                "Canonical categories: Added (type:feat), Changed (type:change | type:refactor | type:docs | type:chore | type:test), Deprecated (type:deprecated), Removed (type:breaking), Fixed (type:fix), Security (security).\n" +
+                `Current labels: ${labels.join(", ")}`
+              );
+            } else {
+              core.info("Label guard passed: labels are consistent with canonical labeling.");
+            }

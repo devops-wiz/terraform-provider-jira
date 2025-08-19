@@ -1,14 +1,19 @@
+// Copyright (c) DevOps Wiz
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
 	"bytes"
+	"regexp"
+	"testing"
+	"text/template"
+
+	"github.com/devops-wiz/terraform-provider-jira/internal/provider/testhelpers"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
-	"regexp"
-	"testing"
-	"text/template"
 )
 
 var testTypeIDs = []string{"10000", "10004", "10002"}
@@ -28,7 +33,7 @@ func TestAccWorkTypesDataSource_basic(t *testing.T) {
 					Config: testAccWorkTypesDataSourceConfig(t, nil, nil),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("work_types"), knownvalue.MapPartial(map[string]knownvalue.Check{
-							"sub-task": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"10003": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 								"id":   knownvalue.StringExact("10003"),
 								"name": knownvalue.StringExact("Sub-task"),
 							}),
@@ -50,15 +55,15 @@ func TestAccWorkTypesDataSource_basic(t *testing.T) {
 					Config: testAccWorkTypesDataSourceConfig(t, testTypeIDs, nil),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("work_types"), knownvalue.MapPartial(map[string]knownvalue.Check{
-							"epic": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"10000": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 								"id":   knownvalue.StringExact("10000"),
 								"name": knownvalue.StringExact("Epic"),
 							}),
-							"bug": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"10004": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 								"id":   knownvalue.StringExact("10004"),
 								"name": knownvalue.StringExact("Bug"),
 							}),
-							"task": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"10002": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 								"id":   knownvalue.StringExact("10002"),
 								"name": knownvalue.StringExact("Task"),
 							}),
@@ -80,11 +85,11 @@ func TestAccWorkTypesDataSource_basic(t *testing.T) {
 					Config: testAccWorkTypesDataSourceConfig(t, nil, testTypeNames),
 					ConfigStateChecks: []statecheck.StateCheck{
 						statecheck.ExpectKnownValue(rName, tfjsonpath.New("work_types"), knownvalue.MapPartial(map[string]knownvalue.Check{
-							"story": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"10001": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 								"id":   knownvalue.StringExact("10001"),
 								"name": knownvalue.StringExact("Story"),
 							}),
-							"bug": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"10004": knownvalue.ObjectPartial(map[string]knownvalue.Check{
 								"id":   knownvalue.StringExact("10004"),
 								"name": knownvalue.StringExact("Bug"),
 							}),
@@ -118,7 +123,7 @@ func TestAccWorkTypesDataSource_expectError(t *testing.T) {
 func testAccWorkTypesDataSourceConfig(t *testing.T, ids, names []string) string {
 	t.Helper()
 
-	tmpl, err := template.New(dataWorkTypesTmpl).ParseFiles(dataWorkTypesTmplPath)
+	tmpl, err := template.New(testhelpers.DataWorkTypesTmpl).ParseFiles(testhelpers.DataWorkTypesTmplPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,4 +145,69 @@ func testAccWorkTypesDataSourceConfig(t *testing.T, ids, names []string) string 
 	}
 
 	return tfFile.String()
+}
+
+func TestAccWorkTypesDataSource_namesCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	rName := "data.jira_work_types.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccWorkTypesDataSourceConfig(t, nil, []string{"bUg", "STORY"}),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(rName, tfjsonpath.New("work_types"), knownvalue.MapPartial(map[string]knownvalue.Check{
+						"10001": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"id":   knownvalue.StringExact("10001"),
+							"name": knownvalue.StringExact("Story"),
+						}),
+						"10004": knownvalue.ObjectPartial(map[string]knownvalue.Check{
+							"id":   knownvalue.StringExact("10004"),
+							"name": knownvalue.StringExact("Bug"),
+						}),
+					})),
+					statecheck.ExpectKnownValue(rName, tfjsonpath.New("work_types"), knownvalue.MapSizeExact(2)),
+				},
+			},
+		},
+	})
+}
+
+func TestAccWorkTypesDataSource_notFound(t *testing.T) {
+	t.Parallel()
+	rName := "data.jira_work_types.test"
+
+	t.Run("names not found returns empty", func(t *testing.T) {
+		t.Parallel()
+		resource.Test(t, resource.TestCase{
+			PreCheck:                 func() { testAccPreCheck(t) },
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+			Steps: []resource.TestStep{
+				{
+					Config: testAccWorkTypesDataSourceConfig(t, nil, []string{"___DOES_NOT_EXIST___"}),
+					ConfigStateChecks: []statecheck.StateCheck{
+						statecheck.ExpectKnownValue(rName, tfjsonpath.New("work_types"), knownvalue.MapSizeExact(0)),
+					},
+				},
+			},
+		})
+	})
+
+	t.Run("ids not found returns empty", func(t *testing.T) {
+		t.Parallel()
+		resource.Test(t, resource.TestCase{
+			PreCheck:                 func() { testAccPreCheck(t) },
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+			Steps: []resource.TestStep{
+				{
+					Config: testAccWorkTypesDataSourceConfig(t, []string{"99999999"}, nil),
+					ConfigStateChecks: []statecheck.StateCheck{
+						statecheck.ExpectKnownValue(rName, tfjsonpath.New("work_types"), knownvalue.MapSizeExact(0)),
+					},
+				},
+			},
+		})
+	})
 }

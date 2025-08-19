@@ -1,16 +1,21 @@
+// Copyright (c) DevOps Wiz
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
 	"bytes"
+	"testing"
+	"text/template"
+
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
+	"github.com/devops-wiz/terraform-provider-jira/internal/provider/testhelpers"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
-	"testing"
-	"text/template"
 )
 
 const defaultWorkTypeDescription = "Default Work Type Description"
@@ -69,7 +74,7 @@ func TestAccWorkTypeResource_basic(t *testing.T) {
 		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
 		workType := baseWorkType
 		workType.Name = resourceName
-		workType.HierarchyLevel = standardWorkType
+		workType.HierarchyLevel = testhelpers.StandardWorkType
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -90,7 +95,7 @@ func TestAccWorkTypeResource_basic(t *testing.T) {
 		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
 		workType := baseWorkType
 		workType.Name = resourceName
-		workType.HierarchyLevel = subtaskWorkType
+		workType.HierarchyLevel = testhelpers.SubtaskWorkType
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -117,7 +122,7 @@ func TestAccWorkTypeResource_update(t *testing.T) {
 		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
 		workType := baseWorkType
 		workType.Name = resourceName
-		workType.HierarchyLevel = standardWorkType
+		workType.HierarchyLevel = testhelpers.StandardWorkType
 		workTypeChanged := workType
 		updatedDescription := "Updated Work Type Description"
 		workTypeChanged.Description = updatedDescription
@@ -154,9 +159,9 @@ func TestAccWorkTypeResource_update(t *testing.T) {
 		resourceName := acctest.RandomWithPrefix("tf-acc-work-type")
 		workType := baseWorkType
 		workType.Name = resourceName
-		workType.HierarchyLevel = standardWorkType
+		workType.HierarchyLevel = testhelpers.StandardWorkType
 		workTypeChanged := workType
-		workTypeChanged.HierarchyLevel = subtaskWorkType
+		workTypeChanged.HierarchyLevel = testhelpers.SubtaskWorkType
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -188,7 +193,7 @@ func TestAccWorkTypeResource_update(t *testing.T) {
 
 func testAccWorkTypeResourceConfig(t *testing.T, workType models.IssueTypePayloadScheme) string {
 	t.Helper()
-	tmpl, err := template.New(workTypeTmpl).ParseFiles(workTypeTmplPath)
+	tmpl, err := template.New(testhelpers.WorkTypeTmpl).ParseFiles(testhelpers.WorkTypeTmplPath)
 	if err != nil {
 		t.Fatal(err)
 	}

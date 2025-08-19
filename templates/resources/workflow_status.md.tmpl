@@ -1,0 +1,30 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderShortName}}"
+description: |-
+  {{.Description}}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{.Description}}
+
+## Example Usage
+
+{{tffile "examples/resources/jira_workflow_status/resource.tf"}}
+
+### Status Categories
+
+Valid values for `status_category`: `TODO`, `IN_PROGRESS`, `DONE`.
+
+- TODO — Not started/backlog. Use for statuses like "To Do" where work has not begun.
+- IN_PROGRESS — Actively being worked. Use for statuses such as "In Progress", "Implementing", or "Testing".
+- DONE — Completed/resolved. Use for terminal statuses such as "Done" or "Resolved"; issues in this category are treated as complete in boards/reports.
+
+Reference: Atlassian — Manage statuses, resolutions, and priorities (Status categories): https://support.atlassian.com/jira-cloud-administration/docs/manage-statuses-resolutions-and-priorities/#Status-categories
+
+## Additional Examples
+
+- Update name flow:
+{{tffile "examples/resources/jira_workflow_status/update_name/resource.tf"}}
+
+{{.SchemaMarkdown}}

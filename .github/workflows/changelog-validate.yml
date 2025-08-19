@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MPL-2.0
+name: Validate CHANGELOG on tag
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+      - 'v*.*.*+*'
+      - 'v*.*.*-*+*'
+
+jobs:
+  changelog-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate CHANGELOG contains Keep a Changelog version heading
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+
+          echo "Validating CHANGELOG for tag ${TAG}"
+
+          # Escape regex metacharacters in TAG for safe grep usage
+          ESCAPED_TAG="$(printf '%s' "${TAG}" | sed -E 's/[][\.^$*+?(){}|]/\\&/g')"
+
+          # Accept headings like (per Keep a Changelog):
+          #   "## [v1.2.3]" or "## [v1.2.3] - 2025-08-19"
+          #   "## v1.2.3"    or "## v1.2.3 - 2025-08-19"
+          PATTERN="^## \\[${ESCAPED_TAG}\\]( - [0-9]{4}-[0-9]{2}-[0-9]{2})?$|^## ${ESCAPED_TAG}( - [0-9]{4}-[0-9]{2}-[0-9]{2})?$"
+
+          if ! grep -Eiq "${PATTERN}" CHANGELOG.md; then
+            printf "%s\n\n" "CHANGELOG.md does not contain a Keep a Changelog-compliant version heading for ${TAG}."
+            printf "%s\n" "Add a section at the top similar to:"
+            printf "%s\n\n" "## [${TAG}] - YYYY-MM-DD"
+            printf "%s\n" "or:"
+            printf "%s\n\n" "## ${TAG} - YYYY-MM-DD"
+            printf "%s\n" "Then include categorized entries under level-3 headings:"
+            printf "%s\n" "### Added | ### Changed | ### Deprecated | ### Removed | ### Fixed | ### Security"
+            printf "%s\n" "See https://keepachangelog.com/en/1.0.0/ for details."
+            exit 1
+          fi

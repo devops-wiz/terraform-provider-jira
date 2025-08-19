@@ -1,0 +1,26 @@
+name: License headers check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  headers:
+    name: Verify SPDX headers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.6
+      - name: Set up Go
+        uses: actions/setup-go@v5.0.1
+        with:
+          go-version-file: go.mod
+      - name: Install copywrite
+        run: go install github.com/hashicorp/copywrite@latest
+      - name: Check headers for Go files (SPDX MPL-2.0)
+        shell: bash
+        run: |
+          $(go env GOPATH)/bin/copywrite headers
+          git diff --exit-code

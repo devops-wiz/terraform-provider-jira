@@ -1,32 +1,97 @@
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
 	"context"
 	"fmt"
-	jira "github.com/ctreminiom/go-atlassian/v2/jira/v3"
+	"sort"
+	"strings"
+
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
+	"github.com/ctreminiom/go-atlassian/v2/service/jira"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"slices"
-	"strings"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
+
+// listHasUnknown reports if the list itself or any of its elements are unknown.
+func listHasUnknown(l types.List) bool {
+	if l.IsUnknown() {
+		return true
+	}
+	elems := l.Elements()
+	for i := range elems {
+		if elems[i].IsUnknown() {
+			return true
+		}
+	}
+	return false
+}
+
+// getKnownStrings parses a Terraform list of strings into a Go slice.
+// Returns (nil, true) if the list or any of its elements are unknown at plan time, so the caller can defer evaluation.
+// On conversion failures with known values, records an attribute-scoped error and returns (nil, false).
+func getKnownStrings(ctx context.Context, l types.List, attr string, diags *diag.Diagnostics) (vals []string, deferEval bool) {
+	if l.IsNull() {
+		return nil, false
+	}
+	if listHasUnknown(l) {
+		return nil, true
+	}
+	vals = make([]string, len(l.Elements()))
+	if d := l.ElementsAs(ctx, &vals, false); d.HasError() {
+		diags.AddAttributeError(
+			path.Root(attr),
+			fmt.Sprintf("Invalid %s list", attr),
+			fmt.Sprintf("Failed to read '%s' as a list of strings. Ensure all elements are known and of type string.", attr),
+		)
+		diags.Append(d...)
+		return nil, false
+	}
+	return vals, false
+}
+
+// uniqueStrings returns a de-duplicated slice preserving first occurrence order.
+func uniqueStrings(in []string) []string {
+	if len(in) == 0 {
+		return in
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
+}
 
 var _ datasource.DataSource = (*workTypesDataSource)(nil)
 var _ datasource.DataSourceWithConfigure = (*workTypesDataSource)(nil)
 
+// NewWorkTypesDataSource returns the Terraform data source implementation for jira_work_types.
 func NewWorkTypesDataSource() datasource.DataSource {
 	return &workTypesDataSource{}
 }
 
 var emptyTypeModel = workTypeResourceModel{}
 
+// When filtering by ids or names, Jira's /issuetype lacks server-side filtering and pagination.
+// Emit a debug log when we must client-side filter a large set to aid troubleshooting.
+const workTypesClientFilterThreshold = 100
+
 type workTypesDataSource struct {
-	client *jira.Client
+	baseJira
+	typeService jira.TypeConnector
 }
 
 type workTypesDataSourceModel struct {
@@ -35,11 +100,11 @@ type workTypesDataSourceModel struct {
 	WorkTypes types.Map  `tfsdk:"work_types"`
 }
 
-func (d *workTypesDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (d *workTypesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_work_types"
 }
 
-func (d *workTypesDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *workTypesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Use this data source to retrieve a list of work types from Jira.",
 		Attributes: map[string]schema.Attribute{
@@ -49,6 +114,8 @@ func (d *workTypesDataSource) Schema(ctx context.Context, req datasource.SchemaR
 				Description: "The Ids of the work type to search. If not provided, all work types will be returned.",
 				Validators: []validator.List{
 					listvalidator.ConflictsWith(path.MatchRoot("names")),
+					listvalidator.UniqueValues(),
+					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
 				},
 			},
 			"names": schema.ListAttribute{
@@ -57,11 +124,13 @@ func (d *workTypesDataSource) Schema(ctx context.Context, req datasource.SchemaR
 				Description: "The name of the work type to search. If not provided, all work types will be returned.",
 				Validators: []validator.List{
 					listvalidator.ConflictsWith(path.MatchRoot("ids")),
+					listvalidator.UniqueValues(),
+					listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
 				},
 			},
 			"work_types": schema.MapNestedAttribute{
-				Computed:    true,
-				Description: "List of work types returned by the query.",
+				Computed:            true,
+				MarkdownDescription: "Map of work types returned by the query, keyed by work type ID for stability across renames.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -69,7 +138,7 @@ func (d *workTypesDataSource) Schema(ctx context.Context, req datasource.SchemaR
 							MarkdownDescription: "The unique identifier of the work type. Automatically generated by Jira when the work type is created.",
 						},
 						"name": schema.StringAttribute{
-							Required:            true,
+							Computed:            true,
 							MarkdownDescription: "The display name of the work type. This appears in the issue creation dialog and issue views.",
 						},
 						"icon_url": schema.StringAttribute{
@@ -77,7 +146,7 @@ func (d *workTypesDataSource) Schema(ctx context.Context, req datasource.SchemaR
 							Computed:            true,
 						},
 						"description": schema.StringAttribute{
-							Optional:            true,
+							Computed:            true,
 							MarkdownDescription: "A detailed description of the work type. This helps users understand the purpose and usage of this work type.",
 						},
 						"subtask": schema.BoolAttribute{
@@ -89,7 +158,6 @@ func (d *workTypesDataSource) Schema(ctx context.Context, req datasource.SchemaR
 							MarkdownDescription: "The ID of the avatar for the work type.",
 						},
 						"hierarchy_level": schema.Int32Attribute{
-							Optional:            true,
 							Computed:            true,
 							MarkdownDescription: hierarchyDescription,
 						},
@@ -100,7 +168,7 @@ func (d *workTypesDataSource) Schema(ctx context.Context, req datasource.SchemaR
 	}
 }
 
-func (d *workTypesDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *workTypesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -117,108 +185,135 @@ func (d *workTypesDataSource) Configure(ctx context.Context, req datasource.Conf
 	}
 
 	d.client = provider.client
+	d.typeService = provider.client.Issue.Type
+	d.providerTimeouts = provider.providerTimeouts
 }
 
 func (d *workTypesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	ctx, cancel := withTimeout(ctx, d.providerTimeouts.Read)
+	defer cancel()
 	var data workTypesDataSourceModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !data.Ids.IsNull() {
-		var ids = make([]string, len(data.Ids.Elements()))
-		resp.Diagnostics.Append(data.Ids.ElementsAs(ctx, &ids, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	// Parse ids and names. Defer evaluation on unknowns to avoid plan-time noise.
+	ids, deferIDs := getKnownStrings(ctx, data.Ids, "ids", &resp.Diagnostics)
+	if resp.Diagnostics.HasError() || deferIDs {
+		return
+	}
+	names, deferNames := getKnownStrings(ctx, data.Names, "names", &resp.Diagnostics)
+	if resp.Diagnostics.HasError() || deferNames {
+		return
+	}
 
-		workTypeModels := make(map[string]workTypeResourceModel, len(ids))
+	action := "list work types"
+	if len(ids) > 0 {
+		action += fmt.Sprintf(" (filter=ids:%d)", len(ids))
+	}
+	if len(names) > 0 {
+		action += fmt.Sprintf(" (filter=names:%d)", len(names))
+	}
 
-		for _, id := range ids {
-			issueType, apiResp, err := d.client.Issue.Type.Get(ctx, id)
-			if err != nil {
-				resp.Diagnostics.AddError("Error reading resource", fmt.Sprintf("Error:\n%s", err.Error()))
-				return
+	// Note: Jira's /issuetype list endpoint is not paginated and does not support server-side filtering by name.
+	// Prefer a single list call and client-side filtering for both IDs and names.
+	issueTypes, apiResp, err := d.typeService.Gets(ctx)
+	if !EnsureSuccessOrDiagFromSchemeWithOptions(ctx, action, apiResp, err, &resp.Diagnostics, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
+		return
+	}
+
+	// Build cached lookups (by ID and case-insensitive name)
+	byID := make(map[string]*models.IssueTypeScheme, len(issueTypes))
+	byNameCI := make(map[string]*models.IssueTypeScheme, len(issueTypes))
+	for _, it := range issueTypes {
+		byID[it.ID] = it
+		byNameCI[strings.ToLower(it.Name)] = it
+	}
+
+	selected := make(map[string]*models.IssueTypeScheme)
+
+	if len(ids) > 0 {
+		var missing []string
+		for _, id := range uniqueStrings(ids) {
+			if it, ok := byID[id]; ok {
+				selected[it.ID] = it
+			} else {
+				missing = append(missing, id)
 			}
-
-			if apiResp.StatusCode != 200 {
-				resp.Diagnostics.AddError("Error reading resource", fmt.Sprintf("Error:\n%s", apiResp.Body))
-				return
-			}
-			workTypeModels[strings.ToLower(issueType.Name)] = workTypeResourceModel{
-				Id:             types.StringValue(issueType.ID),
-				Name:           types.StringValue(issueType.Name),
-				HierarchyLevel: types.Int32Value(int32(issueType.HierarchyLevel)),
-				Subtask:        types.BoolValue(issueType.Subtask),
-				AvatarID:       types.Int64Value(int64(issueType.AvatarID)),
-				IconURL:        types.StringValue(issueType.IconURL),
+		}
+		if len(missing) > 0 {
+			sort.Strings(missing)
+			resp.Diagnostics.AddWarning(
+				"Some requested work type IDs were not found",
+				fmt.Sprintf("The following IDs were not found in Jira: %v. They will be omitted from the result.", missing),
+			)
+		}
+	} else if len(names) > 0 {
+		var missing []string
+		for _, n := range uniqueStrings(names) {
+			if it, ok := byNameCI[strings.ToLower(n)]; ok {
+				selected[it.ID] = it
+			} else {
+				missing = append(missing, n)
 			}
 		}
-
-		var tempDiag diag.Diagnostics
-
-		data.WorkTypes, tempDiag = types.MapValueFrom(ctx, types.ObjectType{AttrTypes: emptyTypeModel.AttributeTypes()}, workTypeModels)
-
-		resp.Diagnostics.Append(tempDiag...)
-		if resp.Diagnostics.HasError() {
-			return
+		if len(missing) > 0 {
+			sort.Strings(missing)
+			resp.Diagnostics.AddWarning(
+				"Some requested work type names were not found",
+				fmt.Sprintf("The following names were not found in Jira: %v. They will be omitted from the result.", missing),
+			)
 		}
-
 	} else {
-		issueTypes, apiResp, err := d.client.Issue.Type.Gets(ctx)
-
-		if err != nil {
-			resp.Diagnostics.AddError("Error reading resource", fmt.Sprintf("Error:\n%s", err.Error()))
-			return
-		}
-
-		if apiResp.StatusCode != 200 {
-			resp.Diagnostics.AddError("Error reading resource", fmt.Sprintf("Error:\n%s", apiResp.Body))
-			return
-		}
-
-		if len(issueTypes) > 0 {
-
-			if !data.Names.IsNull() {
-				var names = make([]string, len(data.Names.Elements()))
-				resp.Diagnostics.Append(data.Names.ElementsAs(ctx, &names, false)...)
-				if resp.Diagnostics.HasError() {
-					return
-				}
-				// Filter issueTypes by name
-				filteredIssueTypes := slices.DeleteFunc(issueTypes, func(issueType *models.IssueTypeScheme) bool {
-					return !slices.Contains(names, issueType.Name)
-				})
-
-				// Replace the original slice with the filtered one
-				issueTypes = filteredIssueTypes
-			}
-
-			workTypeModels := make(map[string]workTypeResourceModel, len(issueTypes))
-
-			for _, issueType := range issueTypes {
-				workTypeModels[strings.ToLower(issueType.Name)] = workTypeResourceModel{
-					Id:             types.StringValue(issueType.ID),
-					Name:           types.StringValue(issueType.Name),
-					HierarchyLevel: types.Int32Value(int32(issueType.HierarchyLevel)),
-					Subtask:        types.BoolValue(issueType.Subtask),
-					AvatarID:       types.Int64Value(int64(issueType.AvatarID)),
-					IconURL:        types.StringValue(issueType.IconURL),
-				}
-			}
-
-			var tempDiag diag.Diagnostics
-			data.WorkTypes, tempDiag = types.MapValueFrom(ctx, types.ObjectType{AttrTypes: emptyTypeModel.AttributeTypes()}, workTypeModels)
-			resp.Diagnostics.Append(tempDiag...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
+		for _, it := range issueTypes {
+			selected[it.ID] = it
 		}
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	// Debug: if we are applying client-side filtering over a large set, emit a message to aid troubleshooting.
+	if (len(ids) > 0 || len(names) > 0) && len(issueTypes) >= workTypesClientFilterThreshold {
+		tflog.Debug(ctx, "Client-side filtering of work types due to Jira /issuetype limitations", map[string]interface{}{
+			"total_fetched":      len(issueTypes),
+			"ids_filter_count":   len(ids),
+			"names_filter_count": len(names),
+			"result_count":       len(selected),
+			"threshold":          workTypesClientFilterThreshold,
+		})
+	}
+
+	workTypeModels := make(map[string]workTypeResourceModel, len(selected))
+	for id, it := range selected {
+		workTypeModels[id] = workTypeResourceModel{
+			ID:             types.StringValue(it.ID),
+			Name:           types.StringValue(it.Name),
+			HierarchyLevel: types.Int32Value(int32(it.HierarchyLevel)),
+			Subtask:        types.BoolValue(it.Subtask),
+			AvatarID:       types.Int64Value(int64(it.AvatarID)),
+			IconURL:        types.StringValue(it.IconURL),
+		}
+	}
+
+	var mDiag diag.Diagnostics
+	data.WorkTypes, mDiag = types.MapValueFrom(ctx, types.ObjectType{AttrTypes: emptyTypeModel.AttributeTypes()}, workTypeModels)
+	if mDiag.HasError() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("work_types"),
+			"Failed to build work_types",
+			fmt.Sprintf("Could not encode %d work types into state. This may indicate a schema mismatch or unexpected nulls. See underlying diagnostics for details.", len(workTypeModels)),
+		)
+		resp.Diagnostics.Append(mDiag...)
+		return
+	}
+
+	if diags := resp.State.Set(ctx, &data); diags.HasError() {
+		resp.Diagnostics.AddError(
+			"Failed to set data source state",
+			"An unexpected error occurred while writing computed data to Terraform state. See diagnostics for details.",
+		)
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 }

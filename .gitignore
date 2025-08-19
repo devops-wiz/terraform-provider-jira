@@ -33,4 +33,9 @@ website/vendor
 # Keep windows files with windows line endings
 *.winfile eol=crlf
 .env
-/scratch/
+/scratch
+
+# JetBrains HTTP Client (local env files)
+http-client.env.json
+http-client.private.env.json
+/docs-internal/openapi/swagger-v3.v3.json

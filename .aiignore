@@ -1,12 +1,43 @@
-# An .aiignore file follows the same syntax as a .gitignore file.
-# .gitignore documentation: https://git-scm.com/docs/gitignore
+# AI indexing/assistant ignore patterns for this Go + Terraform provider repo
 
-# you can ignore files
-.DS_Store
-*.log
-*.tmp
+# Secrets and local environment
+.env
+.env.*
+!.env.example
 
-# or folders
-dist/
+# Go build/test outputs
+coverage.out
+*.coverprofile
+*.test
+bin/
 build/
-out/
+dist/
+
+# Editor/IDE
+.idea/
+.vscode/
+*.iml
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Terraform local state and caches
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Scratch and temporary
+scratch/
+tmp/
+*.log
+
+# Vendor or dependency caches (if ever present locally)
+vendor/
+
+# Generated or packaging artifacts not needed for AI context
+# Keep docs/ included for context; exclude release bundles only
+*.zip
+*.tar.gz
+*.tgz

@@ -1,14 +1,18 @@
+// Copyright (c) DevOps Wiz
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
-	"testing"
 )
 
 const defaultWorkflowStatusDescription = "Default Workflow Status Description"
