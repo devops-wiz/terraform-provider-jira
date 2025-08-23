@@ -1,0 +1,13 @@
+{{range .ProjectResources -}}
+{{ . }}
+
+{{end}}
+
+
+data "jira_project" "{{.DataName}}" {
+  {{- if eq .LookupBy "key"}}
+  key = jira_project.test.key
+  {{- else if eq .LookupBy "id"}}
+  id  = jira_project.test.id
+  {{- end}}
+}

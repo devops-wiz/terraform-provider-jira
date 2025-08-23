@@ -1,0 +1,9 @@
+resource "jira_project" "test" {
+    key              = "{{.Key}}"
+    name             = "{{.Name}}"
+    project_type_key = "{{.ProjectType}}"
+    lead_account_id  = "{{.LeadAccountID}}"
+{{if ne .Description "" -}}
+    description = "{{.Description}}"
+{{- end}}
+}
