@@ -28,7 +28,7 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@e75c3e80bcde46e322cd5845ae46582947c9becd # v5.5.0
         with:
           go-version-file: "go.mod"
           cache: true
@@ -82,7 +82,7 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      - uses: actions/setup-go@e75c3e80bcde46e322cd5845ae46582947c9becd # v5.5.0
         with:
           go-version-file: "go.mod"
           cache: true
