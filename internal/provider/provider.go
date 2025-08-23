@@ -317,6 +317,7 @@ func (j *JiraProvider) Resources(_ context.Context) []func() resource.Resource {
 func (j *JiraProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewWorkTypesDataSource,
+		NewProjectDataSource,
 	}
 }
 

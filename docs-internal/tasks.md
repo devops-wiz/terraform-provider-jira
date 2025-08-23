@@ -142,7 +142,7 @@ Alignment and numbering guidance:
 ### Backlog / In Progress
 
 1. [done] jira_project — CRUD + import; acceptance tests; docs/examples; required permissions documented. Acceptance: tests pass; docs no-diff. [series: MVP Resources Implementation (Plan §18)]
-2. [todo] jira_project — lookup by key/ID. Acceptance: tests; docs/examples; no-diff. [series: MVP Data Sources Implementation (Plan §18)]
+2. [done] jira_project — lookup by key/ID. [progress:2/2] Acceptance: tests; docs/examples; no-diff. [series: MVP Data Sources Implementation (Plan §18)]
 3. [todo] jira_projects — list/filter; pagination. Acceptance: tests; docs/examples; no-diff. [series: MVP Data Sources Implementation (Plan §18)]
 4. [todo] jira_fields — list/filter; deterministic ordering; server-side filtering if supported. Acceptance: tests; docs/examples; no-diff. [series: MVP Data Sources Implementation (Plan §18)]
 5. [todo] jira_priority — CRUD + import (custom priorities); acceptance tests; docs/examples. Acceptance: tests pass; docs no-diff. [series: MVP Resources Implementation (Plan §18)]
