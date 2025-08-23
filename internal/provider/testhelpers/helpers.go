@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 )
@@ -116,4 +117,85 @@ func MkRS(code int, headers http.Header, body string) *models.ResponseScheme {
 	}
 
 	return rs
+}
+
+// TestAccProjectWithDataSource generates a Terraform configuration string for creating a Jira project and data sources.
+// This function requires project attributes such as key, name, project type, and lookup type.
+// It uses a template file to build the configuration and executes it with provided parameters.
+// The returned string can be used in acceptance tests to verify resource and data source integration.
+func TestAccProjectWithDataSource(t *testing.T, key, name, projectType, lookupType string) string {
+	t.Helper()
+
+	projectResTmpl, err := template.New(ProjectTmpl).ParseFiles(ProjectTmplPath)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var projTF bytes.Buffer
+
+	projectTmplCfg := ProjectTmplCfg{
+		Key:           key,
+		Name:          name,
+		ProjectType:   projectType,
+		LeadAccountID: TestAccLeadAccountID(),
+	}
+
+	if err = projectResTmpl.Execute(&projTF, projectTmplCfg); err != nil {
+		t.Fatal(err)
+	}
+
+	dataTmpl, err := template.New(DataProjectTmpl).ParseFiles(DataProjectTmplPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var dataTf bytes.Buffer
+	dataName := "by_key"
+	if lookupType == "id" {
+		dataName = "by_id"
+	}
+
+	dataTmplCfg := DataProjectsCfg{
+		ProjectResources: []string{projTF.String()},
+		DataName:         dataName,
+		LookupBy:         lookupType,
+	}
+	if err = dataTmpl.Execute(&dataTf, dataTmplCfg); err != nil {
+		t.Fatal(err)
+	}
+
+	return dataTf.String()
+}
+
+func TestAccLeadAccountID() string {
+	return strings.TrimSpace(os.Getenv("JIRA_PROJECT_TEST_ROLE_LEAD_ID"))
+}
+
+func TestAccProjectResourceConfig(t *testing.T, key, name, projectType, leadAccountID, description string) string {
+	t.Helper()
+
+	tmpl, err := template.New(ProjectTmpl).ParseFiles(ProjectTmplPath)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var projectTf bytes.Buffer
+
+	projectTmplCfg := ProjectTmplCfg{
+		Key:           key,
+		Name:          name,
+		ProjectType:   projectType,
+		LeadAccountID: leadAccountID,
+		Description:   description,
+	}
+
+	err = tmpl.Execute(&projectTf, projectTmplCfg)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return projectTf.String()
 }

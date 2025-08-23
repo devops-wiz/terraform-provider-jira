@@ -93,7 +93,7 @@ FR-3: Resource lifecycle mapped to go-atlassian
 
 FR-4: Data sources using go-atlassian
 - List/lookup endpoints for existing configuration (work types, statuses, fields, etc.).
-- Support name/ID filters; validate mutually exclusive arguments; paginate where necessary.
+- Support filters for list endpoints if available from Jira API; validate mutually exclusive arguments; paginate where necessary.
 
 FR-5: Idempotence & state accuracy
 - Store canonical IDs and avoid ephemeral server fields in state.
