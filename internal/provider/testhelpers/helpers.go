@@ -199,3 +199,27 @@ func TestAccProjectResourceConfig(t *testing.T, key, name, projectType, leadAcco
 
 	return projectTf.String()
 }
+
+func TestAccProjectCategoryConfig(t *testing.T, name, desc string) string {
+	t.Helper()
+	tmpl, err := template.New(ProjectCatTmpl).ParseFiles(ProjectCatTmplPath)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var projectCatTf bytes.Buffer
+
+	projectTmplCfg := ProjectCatTmplCfg{
+		Name:        name,
+		Description: desc,
+	}
+
+	err = tmpl.Execute(&projectCatTf, projectTmplCfg)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return projectCatTf.String()
+}
