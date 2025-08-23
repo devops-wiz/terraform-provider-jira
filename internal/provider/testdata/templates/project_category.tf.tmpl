@@ -1,0 +1,6 @@
+resource "jira_project_category" "test" {
+    name             = "{{.Name}}"
+{{if ne .Description "" -}}
+    description = "{{.Description}}"
+{{- end}}
+}

@@ -4,13 +4,12 @@
 package provider
 
 import (
-	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/devops-wiz/terraform-provider-jira/internal/provider/testhelpers"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
@@ -19,6 +18,7 @@ import (
 )
 
 // randomProjectKey generates a Jira project key (uppercase letters) of length n (2..10)
+// nolint:unparam // kept signature for potential future variation; currently called with constant length in tests
 func randomProjectKey(n int) string {
 	if n < 2 {
 		n = 2
@@ -43,19 +43,19 @@ func TestAccProjectResource_basic(t *testing.T) {
 	// Random but valid key and names
 	key := randomProjectKey(6)
 	name := acctest.RandomWithPrefix("tf-acc-project")
-	// Ensure name doesn't contain characters Jira forbids for project names
+	// Ensure the name doesn't contain characters Jira forbids for project names
 	name = strings.ReplaceAll(name, "_", "-")
 
 	projectType := "software"
 	updatedDesc := "Updated project description"
-	leadAccountID := strings.TrimSpace(os.Getenv("JIRA_PROJECT_TEST_ROLE_LEAD_ID"))
+	leadAccountID := testhelpers.TestAccLeadAccountID()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccProjectResourceConfig(key, name, projectType, leadAccountID, ""),
+				Config: testhelpers.TestAccProjectResourceConfig(t, key, name, projectType, leadAccountID, ""),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("key"), knownvalue.StringExact(key)),
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(name)),
@@ -63,7 +63,7 @@ func TestAccProjectResource_basic(t *testing.T) {
 				},
 			},
 			{
-				Config: testAccProjectResourceConfig(key, name, projectType, leadAccountID, updatedDesc),
+				Config: testhelpers.TestAccProjectResourceConfig(t, key, name, projectType, leadAccountID, updatedDesc),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("description"), knownvalue.StringExact(updatedDesc)),
 				},
@@ -75,21 +75,4 @@ func TestAccProjectResource_basic(t *testing.T) {
 			},
 		},
 	})
-}
-
-func testAccProjectResourceConfig(key, name, projectType, leadAccountID, description string) string {
-	// description is optional; include only if non-empty
-	descLine := ""
-	if strings.TrimSpace(description) != "" {
-		descLine = fmt.Sprintf("  description       = \"%s\"\n", description)
-	}
-
-	return fmt.Sprintf(`
-resource "jira_project" "test" {
-  key               = "%s"
-  name              = "%s"
-  project_type_key  = "%s"
-  lead_account_id   = "%s"
-%s}
-`, key, name, projectType, leadAccountID, descLine)
 }
