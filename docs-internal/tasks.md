@@ -144,7 +144,7 @@ Alignment and numbering guidance:
 1. [done] jira_project — CRUD + import; acceptance tests; docs/examples; required permissions documented. Acceptance: tests pass; docs no-diff. [series: MVP Resources Implementation (Plan §18)]
 2. [done] jira_project — lookup by key/ID. [progress:2/2] Acceptance: tests; docs/examples; no-diff. [series: MVP Data Sources Implementation (Plan §18)]
 3. [done] jira_projects — list/filter; pagination. Acceptance: tests; docs/examples; no-diff. [progress:3/3] [series: MVP Data Sources Implementation (Plan §18)]
-4. [todo] jira_project_category resource and data-source
+4. [ip] [progress:1/2] jira_project_category resource and data-source
 5. [todo] jira_fields — list/filter; deterministic ordering; server-side filtering if supported. Acceptance: tests; docs/examples; no-diff. [series: MVP Data Sources Implementation (Plan §18)]
 6. [todo] jira_priority — CRUD + import (custom priorities); acceptance tests; docs/examples. Acceptance: tests pass; docs no-diff. [series: MVP Resources Implementation (Plan §18)]
 7. [todo] jira_priorities — list; deterministic ordering. Acceptance: tests; docs/examples; no-diff. [series: MVP Data Sources Implementation (Plan §18)]

@@ -310,6 +310,7 @@ func (j *JiraProvider) Resources(_ context.Context) []func() resource.Resource {
 		NewWorkTypeResource,
 		NewWorkflowStatusResource,
 		NewProjectResource,
+		NewProjectCategoryResource,
 	}
 }
 

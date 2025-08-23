@@ -44,6 +44,11 @@ func (e FakeNetErr) Temporary() bool { return true }
 // NewFakeNetErr constructs a FakeNetErr with the provided timeout flag.
 func NewFakeNetErr(timeout bool) FakeNetErr { return FakeNetErr{timeout: timeout} }
 
+type ProjectCatTmplCfg struct {
+	Name        string
+	Description string
+}
+
 type ProjectTmplCfg struct {
 	Key           string
 	Name          string
