@@ -5,19 +5,12 @@ package provider
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-	"os"
 	"regexp"
-	"strings"
-	"time"
 
 	jira "github.com/ctreminiom/go-atlassian/v2/jira/v3"
-	"github.com/hashicorp/go-retryablehttp"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -320,6 +313,7 @@ func (j *JiraProvider) DataSources(_ context.Context) []func() datasource.DataSo
 		NewWorkTypesDataSource,
 		NewProjectDataSource,
 		NewProjectsDataSource,
+		NewProjectCategoriesDataSource,
 	}
 }
 
@@ -334,328 +328,16 @@ func New(version string) func() provider.Provider {
 
 // centralized config structures and helpers
 
-const (
-	attrEndpoint            = "endpoint"
-	attrAuthMethod          = "auth_method"
-	attrAPIToken            = "api_token"
-	attrAPIAuthEmail        = "api_auth_email"
-	attrUsername            = "username"
-	attrPassword            = "password"
-	attrHTTPTimeoutSeconds  = "http_timeout_seconds"
-	attrRetryOn4295xx       = "retry_on_429_5xx"
-	attrRetryMaxAttempts    = "retry_max_attempts"
-	attrRetryInitialBackoff = "retry_initial_backoff_ms"
-	attrRetryMaxBackoff     = "retry_max_backoff_ms"
-	attrEmailRedactionMode  = "email_redaction_mode"
-)
-
 // Centralized provider defaults for visibility and reuse
-const (
-	defaultAuthMethod            = "api_token"
-	defaultHTTPTimeoutSeconds    = 30
-	defaultRetryOn4295xx         = true
-	defaultRetryMaxAttempts      = 4
-	defaultRetryInitialBackoffMs = 500
-	defaultRetryMaxBackoffMs     = 5000
-	defaultEmailRedactionMode    = "full"
-)
-
-type validationErr struct {
-	attr    string // empty for general error
-	summary string
-	detail  string
-}
-
-type resolvedConfig struct {
-	endpoint              string
-	authMethod            string
-	email                 string
-	apiToken              string
-	username              string
-	password              string
-	httpTimeoutSeconds    int
-	retryOn4295xx         bool
-	retryMaxAttempts      int
-	retryInitialBackoffMs int
-	retryMaxBackoffMs     int
-	emailRedactionMode    string
-}
 
 // sanitizeEmail masks or redacts an email to avoid PII leakage in logs/errors.
 // Mode controls behavior:
 //   - "full": fully redact, returning "[REDACTED_EMAIL]"
 //   - "mask": partially mask local-part, preserving domain (e.g., "a****@example.com")
-func sanitizeEmail(email string, mode string) string {
-	if email == "" {
-		return ""
-	}
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	if mode == "" {
-		mode = defaultEmailRedactionMode
-	}
-	if mode != "full" && mode != "mask" {
-		mode = defaultEmailRedactionMode
-	}
-	// Full redaction: never expose local-part or domain.
-	if mode == "full" {
-		return "[REDACTED_EMAIL]"
-	}
-
-	at := strings.IndexByte(email, '@')
-	if at <= 0 || at == len(email)-1 {
-		// Not a standard email; return a generic token to avoid echoing the raw value.
-		return "[REDACTED_EMAIL]"
-	}
-	domain := email[at+1:]
-	return "a****@" + domain
-}
-
-// redactSecretValue replaces a sensitive value with a stable token.
-// If the value is empty, it returns the empty string to avoid adding tokens where not needed.
-func redactSecretValue(v string) string {
-	if v == "" {
-		return ""
-	}
-	return "[REDACTED]"
-}
-
-// sanitizeValidationError returns a copy of the given validation error with secrets redacted.
-func sanitizeValidationError(e validationErr, rc resolvedConfig) validationErr {
-	// Build a mapping of raw -> redacted tokens
-	replacements := map[string]string{}
-
-	if rc.apiToken != "" {
-		replacements[rc.apiToken] = redactSecretValue(rc.apiToken)
-	}
-	if rc.password != "" {
-		replacements[rc.password] = redactSecretValue(rc.password)
-	}
-	if rc.username != "" {
-		// Usernames can be sensitive; redact fully.
-		replacements[rc.username] = redactSecretValue(rc.username)
-	}
-	if rc.email != "" {
-		// For emails, replace with policy-driven sanitization (defaults to full).
-		replacements[rc.email] = sanitizeEmail(rc.email, rc.emailRedactionMode)
-	}
-
-	// Apply replacements to summary/detail without echoing the original values.
-	summary := e.summary
-	detail := e.detail
-	for raw, red := range replacements {
-		if raw == "" {
-			continue
-		}
-		if summary != "" {
-			summary = strings.ReplaceAll(summary, raw, red)
-		}
-		if detail != "" {
-			detail = strings.ReplaceAll(detail, raw, red)
-		}
-	}
-
-	e.summary = summary
-	e.detail = detail
-	return e
-}
-
-// generic readers (HCL over env, then default behavior per caller)
-func readString(s types.String, env string) string {
-	if !s.IsNull() && !s.IsUnknown() {
-		return s.ValueString()
-	}
-	if env == "" {
-		return ""
-	}
-	return os.Getenv(env)
-}
-
-func readInt64Default(v types.Int64, def int) int {
-	if !v.IsNull() && !v.IsUnknown() {
-		return int(v.ValueInt64())
-	}
-	return def
-}
-
-func readBoolDefault(v types.Bool, def bool) bool {
-	if !v.IsNull() && !v.IsUnknown() {
-		return v.ValueBool()
-	}
-	return def
-}
-
-// readStringWithAliases reads a string preferring the HCL value, then a canonical env var,
-// then any number of alias env vars in order.
-func readStringWithAliases(s types.String, canonical string, aliases ...string) string {
-	// Prefer HCL, then canonical env
-	if v := readString(s, canonical); v != "" {
-		return v
-	}
-	// Fallback to aliases in provided order
-	for _, a := range aliases {
-		if a == "" {
-			continue
-		}
-		if v := os.Getenv(a); v != "" {
-			return v
-		}
-	}
-	return ""
-}
 
 // configuration derivation (unified) to avoid duplicated parsing across sections
-func deriveResolvedConfig(data JiraProviderModel) resolvedConfig {
-	// Base
-	authMethod := readString(data.AuthMethod, "")
-	if authMethod == "" {
-		authMethod = defaultAuthMethod
-	}
-	endpoint := readStringWithAliases(data.Endpoint, "JIRA_ENDPOINT", "JIRA_BASE_URL")
-
-	// Auth
-	email := readStringWithAliases(data.APIAuthEmail, "JIRA_API_EMAIL", "JIRA_EMAIL")
-	apiToken := readString(data.APIToken, "JIRA_API_TOKEN")
-	username := readString(data.Username, "JIRA_USERNAME")
-	password := readString(data.Password, "JIRA_PASSWORD")
-
-	// HTTP
-	httpTimeoutSeconds := readInt64Default(data.HTTPTimeoutSeconds, defaultHTTPTimeoutSeconds)
-
-	// Retry
-	retryOn4295xx := readBoolDefault(data.RetryOn4295xx, defaultRetryOn4295xx)
-	retryMaxAttempts := readInt64Default(data.RetryMaxAttempts, defaultRetryMaxAttempts)
-	retryInitialBackoffMs := readInt64Default(data.RetryInitialBackoffMs, defaultRetryInitialBackoffMs)
-	retryMaxBackoffMs := readInt64Default(data.RetryMaxBackoffMs, defaultRetryMaxBackoffMs)
-
-	// Privacy & Redaction
-	mode := readString(data.EmailRedactionMode, "JIRA_EMAIL_REDACTION_MODE")
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	if mode == "" || (mode != "full" && mode != "mask") {
-		mode = defaultEmailRedactionMode
-	}
-
-	return resolvedConfig{
-		endpoint:              endpoint,
-		authMethod:            authMethod,
-		email:                 email,
-		apiToken:              apiToken,
-		username:              username,
-		password:              password,
-		httpTimeoutSeconds:    httpTimeoutSeconds,
-		retryOn4295xx:         retryOn4295xx,
-		retryMaxAttempts:      retryMaxAttempts,
-		retryInitialBackoffMs: retryInitialBackoffMs,
-		retryMaxBackoffMs:     retryMaxBackoffMs,
-		emailRedactionMode:    mode,
-	}
-}
 
 // validation per-section
-func validateBase(rc resolvedConfig) []validationErr {
-	var errs []validationErr
-	if rc.endpoint == "" {
-		errs = append(errs, validationErr{attr: attrEndpoint, summary: "Missing Endpoint Configuration.", detail: "Provide 'endpoint' or set JIRA_ENDPOINT (or JIRA_BASE_URL alias) environment variable."})
-	}
-	if rc.authMethod != "api_token" && rc.authMethod != "basic" {
-		errs = append(errs, validationErr{attr: attrAuthMethod, summary: "Invalid Auth Method Configuration.", detail: "auth_method must be 'api_token' or 'basic'."})
-	}
-	return errs
-}
-
-func validateHTTP(rc resolvedConfig) []validationErr {
-	if rc.httpTimeoutSeconds < 1 || rc.httpTimeoutSeconds > 600 {
-		return []validationErr{{attr: attrHTTPTimeoutSeconds, summary: "Invalid HTTP Timeout Configuration.", detail: fmt.Sprintf("http_timeout_seconds must be between 1 and 600 seconds; got %d", rc.httpTimeoutSeconds)}}
-	}
-	return nil
-}
-
-func validateRetry(rc resolvedConfig) []validationErr {
-	if !rc.retryOn4295xx {
-		return nil
-	}
-	var errs []validationErr
-	if rc.retryMaxAttempts < 1 || rc.retryMaxAttempts > 10 {
-		errs = append(errs, validationErr{attr: attrRetryMaxAttempts, summary: "Invalid Retry Attempts Configuration.", detail: fmt.Sprintf("retry_max_attempts must be between 1 and 10; got %d", rc.retryMaxAttempts)})
-	}
-	if rc.retryInitialBackoffMs < 100 || rc.retryInitialBackoffMs > 600000 {
-		errs = append(errs, validationErr{attr: attrRetryInitialBackoff, summary: "Invalid Retry Backoff Configuration.", detail: fmt.Sprintf("retry_initial_backoff_ms must be between 100 and 600000 milliseconds; got %d", rc.retryInitialBackoffMs)})
-	}
-	if rc.retryMaxBackoffMs < 100 || rc.retryMaxBackoffMs > 600000 {
-		errs = append(errs, validationErr{attr: attrRetryMaxBackoff, summary: "Invalid Retry Backoff Configuration.", detail: fmt.Sprintf("retry_max_backoff_ms must be between 100 and 600000 milliseconds; got %d", rc.retryMaxBackoffMs)})
-	}
-	if rc.retryInitialBackoffMs > rc.retryMaxBackoffMs {
-		errs = append(errs, validationErr{attr: attrRetryInitialBackoff, summary: "Invalid Retry Backoff Configuration.", detail: "retry_initial_backoff_ms must be less than or equal to retry_max_backoff_ms."})
-	}
-	return errs
-}
-
-func validateAuth(rc resolvedConfig) []validationErr {
-	var errs []validationErr
-	if rc.email != "" && rc.username != "" {
-		return []validationErr{
-			{attr: attrAPIAuthEmail, summary: "Conflicting credentials.", detail: "api_auth_email conflicts with username. Choose API token (api_auth_email + api_token) or basic (username + password), not both."},
-			{attr: attrUsername, summary: "Conflicting credentials.", detail: "username conflicts with api_auth_email. Choose API token (api_auth_email + api_token) or basic (username + password), not both."},
-		}
-	}
-	if rc.email == "" && rc.username == "" {
-		return []validationErr{
-			{attr: attrAPIAuthEmail, summary: "Missing credentials.", detail: "Provide api_auth_email with api_token for API token authentication, or set auth_method = \"basic\" and use username + password."},
-			{attr: attrUsername, summary: "Missing credentials.", detail: "Provide username with password for basic authentication, or use api_auth_email + api_token for API token auth."},
-		}
-	}
-
-	switch rc.authMethod {
-	case "api_token":
-		if rc.email == "" {
-			errs = append(errs, validationErr{attr: attrAPIAuthEmail, summary: "Missing API Auth Email Configuration.", detail: "Provide 'api_auth_email' or set JIRA_API_EMAIL."})
-		}
-		if rc.apiToken == "" {
-			errs = append(errs, validationErr{attr: attrAPIToken, summary: "Missing API Token Configuration.", detail: "Provide 'api_token' or set JIRA_API_TOKEN."})
-		}
-		if rc.username != "" {
-			errs = append(errs, validationErr{attr: attrUsername, summary: "Attribute not allowed with api_token auth_method.", detail: "Remove 'username' (and 'password') or set auth_method = \"basic\"."})
-		}
-		if rc.password != "" {
-			errs = append(errs, validationErr{attr: attrPassword, summary: "Attribute not allowed with api_token auth_method.", detail: "Remove 'password' (and 'username') or set auth_method = \"basic\"."})
-		}
-	case "basic":
-		if rc.username == "" {
-			errs = append(errs, validationErr{attr: attrUsername, summary: "Missing Username Configuration.", detail: "Provide 'username' or set JIRA_USERNAME."})
-		}
-		if rc.password == "" {
-			errs = append(errs, validationErr{attr: attrPassword, summary: "Missing Password Configuration.", detail: "Provide 'password' or set JIRA_PASSWORD."})
-		}
-		if rc.email != "" {
-			errs = append(errs, validationErr{attr: attrAPIAuthEmail, summary: "Attribute not allowed with basic auth_method.", detail: "Remove 'api_auth_email' (and 'api_token') or set auth_method = \"api_token\"."})
-		}
-		if rc.apiToken != "" {
-			errs = append(errs, validationErr{attr: attrAPIToken, summary: "Attribute not allowed with basic auth_method.", detail: "Remove 'api_token' (and 'api_auth_email') or set auth_method = \"api_token\"."})
-		}
-	default:
-		// already handled in validateBase, keep for completeness if validateBase is skipped
-		errs = append(errs, validationErr{attr: attrAuthMethod, summary: "Invalid Auth Method Configuration.", detail: "auth_method must be 'api_token' or 'basic'."})
-	}
-	return errs
-}
-
-func validateResolvedConfig(rc resolvedConfig) []validationErr {
-	var all []validationErr
-	all = append(all, validateBase(rc)...)
-	if len(all) == 0 { // if base fails, skip noisy follow-ups
-		all = append(all, validateHTTP(rc)...)
-		all = append(all, validateRetry(rc)...)
-		all = append(all, validateAuth(rc)...)
-	}
-
-	// Collect validationErrors during checks above
-	// errs := []validationError{ ... }
-
-	// Before returning, sanitize any secrets from messages to prevent leakage.
-	for i := range all {
-		all[i] = sanitizeValidationError(all[i], rc)
-	}
-	return all
-}
 
 // setupDebug configures minimal safe tflog fields and returns whether debug is enabled.
 func (j *JiraProvider) setupDebug(ctx context.Context, data JiraProviderModel) (context.Context, bool) {
@@ -687,48 +369,4 @@ func (j *JiraProvider) resolveAndValidateConfig(ctx context.Context, data JiraPr
 	}
 	verrs := validateResolvedConfig(rc)
 	return rc, verrs
-}
-
-// buildHTTPClient constructs the HTTP client with optional retry/backoff policy.
-func buildHTTPClient(rc resolvedConfig) *http.Client {
-	if rc.retryOn4295xx {
-		rcClient := retryablehttp.NewClient()
-		rcClient.RetryMax = rc.retryMaxAttempts
-		rcClient.RetryWaitMin = time.Duration(rc.retryInitialBackoffMs) * time.Millisecond
-		rcClient.RetryWaitMax = time.Duration(rc.retryMaxBackoffMs) * time.Millisecond
-		// keep default CheckRetry (retries on 429/5xx and honors Retry-After)
-		// disable noisy logging unless debug is desired
-		rcClient.Logger = nil
-		httpClient := rcClient.StandardClient()
-		httpClient.Timeout = time.Duration(rc.httpTimeoutSeconds) * time.Second
-		return httpClient
-	}
-	return &http.Client{Timeout: time.Duration(rc.httpTimeoutSeconds) * time.Second}
-}
-
-// initJiraClient creates the Jira client, sets authentication and user agent.
-func (j *JiraProvider) initJiraClient(httpClient *http.Client, rc resolvedConfig) (*jira.Client, error) {
-	client, err := jira.New(httpClient, rc.endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	switch rc.authMethod {
-	case "api_token":
-		client.Auth.SetBasicAuth(rc.email, rc.apiToken)
-	case "basic":
-		client.Auth.SetBasicAuth(rc.username, rc.password)
-	default:
-		// Should be validated earlier; return an explicit error if reached.
-		return nil, fmt.Errorf("invalid auth_method %q", rc.authMethod)
-	}
-
-	client.Auth.SetUserAgent(fmt.Sprintf("devops-wiz/terraform-provider-jira/%s", j.version))
-	return client, nil
-}
-
-// testConnection checks API connectivity and appends diagnostics on failure.
-func (j *JiraProvider) testConnection(ctx context.Context, client *jira.Client, diags *diag.Diagnostics) bool {
-	_, apiResp, err := client.MySelf.Details(ctx, nil)
-	return EnsureSuccessOrDiagFromScheme(ctx, "authenticate (myself)", apiResp, err, diags)
 }
