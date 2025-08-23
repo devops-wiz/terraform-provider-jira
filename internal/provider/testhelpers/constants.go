@@ -11,11 +11,19 @@ const (
 	TmplPath          = "./testdata/templates"
 	DataWorkTypesTmpl = "data.work_types.tf.tmpl"
 	WorkTypeTmpl      = "work_type.tf.tmpl"
+	DataProjectTmpl   = "data.projects.tf.tmpl"
+	ProjectTmpl       = "project.tf.tmpl"
+	ProjectCatTmpl    = "project_category.tf.tmpl"
 )
 
 var (
 	DataWorkTypesTmplPath = filepath.Join(TmplPath, DataWorkTypesTmpl)
 	WorkTypeTmplPath      = filepath.Join(TmplPath, WorkTypeTmpl)
+
+	DataProjectTmplPath = filepath.Join(TmplPath, DataProjectTmpl)
+	ProjectTmplPath     = filepath.Join(TmplPath, ProjectTmpl)
+
+	ProjectCatTmplPath = filepath.Join(TmplPath, ProjectCatTmpl)
 
 	StandardWorkType = 0
 	SubtaskWorkType  = -1
