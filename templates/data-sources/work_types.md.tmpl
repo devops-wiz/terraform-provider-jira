@@ -8,6 +8,8 @@ description: |-
 
 {{.Description}}
 
+Note: The work_types attribute is a map keyed by work type ID for stability across renames.
+
 ## Example Usage
 
 There are 3 ways to use {{.Name}} data source:
@@ -17,24 +19,19 @@ There are 3 ways to use {{.Name}} data source:
 
 ### No Filtering
 
-```terraform
-data "jira_work_types" "example" {}
-```
+{{tffile "examples/data-sources/jira_work_types/data-source.tf"}}
 
 ### Names Filtering
 
-```terraform
-data "jira_work_types" "example" {
-  names = ["Bug", "Story"]
-}
-```
+{{tffile "examples/data-sources/jira_work_types/filter_by_names/data-source.tf"}}
 
 ### Ids Filtering
 
-```terraform
-data "jira_work_types" "example" {
-  ids = ["10000", "10004"]
-}
-```
+{{tffile "examples/data-sources/jira_work_types/filter_by_ids/data-source.tf"}}
+
+## Additional Examples
+
+- Mixed-case names (case-insensitive matching):
+{{tffile "examples/data-sources/jira_work_types/mixed_case_names/data-source.tf"}}
 
 {{.SchemaMarkdown}}

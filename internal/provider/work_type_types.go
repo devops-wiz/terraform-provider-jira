@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
 	"context"
+
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -9,7 +12,7 @@ import (
 )
 
 type workTypeResourceModel struct {
-	Id             types.String `tfsdk:"id"`
+	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
 	Description    types.String `tfsdk:"description"`
 	IconURL        types.String `tfsdk:"icon_url"`
@@ -18,7 +21,7 @@ type workTypeResourceModel struct {
 	HierarchyLevel types.Int32  `tfsdk:"hierarchy_level"`
 }
 
-func (i *workTypeResourceModel) GetApiPayload(_ context.Context) (createPayload *models.IssueTypePayloadScheme, diags diag.Diagnostics) {
+func (i *workTypeResourceModel) GetAPIPayload(_ context.Context) (createPayload *models.IssueTypePayloadScheme, diags diag.Diagnostics) {
 	return &models.IssueTypePayloadScheme{
 		Name:           i.Name.ValueString(),
 		Description:    i.Description.ValueString(),
@@ -27,12 +30,12 @@ func (i *workTypeResourceModel) GetApiPayload(_ context.Context) (createPayload 
 }
 
 func (i *workTypeResourceModel) GetID() string {
-	return i.Id.ValueString()
+	return i.ID.ValueString()
 }
 
 func (i *workTypeResourceModel) TransformToState(_ context.Context, issueType *models.IssueTypeScheme) diag.Diagnostics {
 	resourceModel := workTypeResourceModel{
-		Id:             types.StringValue(issueType.ID),
+		ID:             types.StringValue(issueType.ID),
 		Name:           types.StringValue(issueType.Name),
 		IconURL:        types.StringValue(issueType.IconURL),
 		Subtask:        types.BoolValue(issueType.Subtask),

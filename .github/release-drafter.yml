@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MPL-2.0
+name-template: "v$NEXT_MAJOR_VERSION.$NEXT_MINOR_VERSION.$NEXT_PATCH_VERSION"
+tag-template: "v$NEXT_MAJOR_VERSION.$NEXT_MINOR_VERSION.$NEXT_PATCH_VERSION"
+
+# Categorize PRs using canonical labels mapped to Keep a Changelog sections
+categories:
+  - title: "🚀 Added"
+    labels: ["type:feat"]
+  - title: "🧰 Changed"
+    labels: ["type:change", "type:refactor", "type:docs", "type:chore", "type:test"]
+  - title: "⚠️ Deprecated"
+    labels: ["type:deprecated"]
+  - title: "🗑️ Removed"
+    labels: ["type:breaking"]
+  - title: "🐞 Fixed"
+    labels: ["type:fix"]
+  - title: "🔒 Security"
+    labels: ["security"]
+
+# Exclude PRs from changelog if labeled accordingly
+exclude-labels:
+  - "skip-changelog"
+  - "skip-release-notes"
+
+# How each PR line appears in the release notes
+change-template: "- $TITLE (#$NUMBER) by @$AUTHOR"
+
+# Resolve version bump based on canonical labels
+version-resolver:
+  major:
+    labels: ["type:breaking"]
+  minor:
+    labels: ["type:feat"]
+  patch:
+    labels: ["type:fix", "security"]
+  default: patch
+
+# Release notes header template to mirror Keep a Changelog style
+template: |
+  ## What's Changed
+
+  ### Added
+  $CHANGES_BY_LABEL:type:feat
+
+  ### Changed
+  $CHANGES_BY_LABEL:type:change,type:refactor,type:docs,type:chore,type:test
+
+  ### Deprecated
+  $CHANGES_BY_LABEL:type:deprecated
+
+  ### Removed
+  $CHANGES_BY_LABEL:type:breaking
+
+  ### Fixed
+  $CHANGES_BY_LABEL:type:fix
+
+  ### Security
+  $CHANGES_BY_LABEL:security
+
+  ## Contributors
+  $CONTRIBUTORS

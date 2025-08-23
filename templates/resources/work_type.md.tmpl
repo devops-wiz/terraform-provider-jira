@@ -14,30 +14,29 @@ There are two types of Work types: Standard and Subtask.
 
 ### Standard Work Type
 
-```terraform
-resource "jira_work_type" "standard_example" {
-  name = "Example Issue Type"
-  # Optional
-  description = "This is an example work type"
-  # 0 by default for standard
-  hierarchy_level = 0
-}
-```
+{{tffile "examples/resources/jira_work_type/standard/resource.tf"}}
 
 ### Subtask Work Type
 
-```terraform
-resource "jira_work_type" "subtask_example" {
-  name = "Example Subtask Issue Type"
-  # Optional
-  description = "This is an example work type"
-  # 0 by default for subtask
-  hierarchy_level = -1
-}
-```
+{{tffile "examples/resources/jira_work_type/subtask/resource.tf"}}
 
 ### Jira Premium
 
 Jira Premium allows custom hierarchy levels for work types. [See the Jira Premium documentation for more information](https://support.atlassian.com/jira-cloud-administration/docs/configure-the-issue-type-hierarchy/).
+
+## Additional Examples
+
+- Update description flow:
+{{tffile "examples/resources/jira_work_type/update_description/resource.tf"}}
+- Import example (shell):
+```sh
+# Import a Jira work type by its canonical ID
+# Ensure you have a matching resource in your configuration, e.g.:
+# resource "jira_work_type" "example" {}
+# Then run:
+terraform import jira_work_type.example 10000
+```
+
+Note: A runnable script is available at examples/resources/jira_work_type/import.sh
 
 {{.SchemaMarkdown}}

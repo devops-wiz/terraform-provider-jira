@@ -21,6 +21,16 @@ tasks:
     cmd: go fmt ./...
     desc: Runs `go fmt ./...`
 
+  goimports:
+    aliases:
+      - imp
+      - imports
+    desc: Runs goimports to fix imports and format code
+    preconditions:
+      - sh: command -v goimports >/dev/null 2>&1
+        msg: "goimports not found. Install with: go install golang.org/x/tools/cmd/goimports@latest"
+    cmd: goimports -w .
+
   build:
     aliases:
       - b
@@ -78,13 +88,19 @@ tasks:
         ref: .ACC | default "false" | regexMatch "^(?i)(true|t)$"
       SWEEP:
         ref: .SWEEP | default "false" | regexMatch "^(?i)(true|t)$"
-
-
+      RACE:
+        ref: .RACE | default "false" | regexMatch "^(?i)(true|t)$"
+      COVER:
+        ref: .COVER | default "false" | regexMatch "^(?i)(true|t)$"
+      COVERPROFILE:
+        ref: .COVERPROFILE | default "coverage.out"
+      FLAGS: "{{if .RACE}} -race{{end}}{{if .COVER}} -cover -coverprofile={{.COVERPROFILE}}{{end}}"
 
     dotenv:
       - .env
     env:
       TF_ACC: '{{if or .ACC .ACC_ONLY}}1{{end}}'
+      GOFLAGS: '{{.FLAGS}}'
 
     cmds:
       - cmd: |
@@ -97,6 +113,68 @@ tasks:
         {{- if ne .RUN_PATTERN "none"}} -run ".RUN_PATTERN"{{end -}}
         {{- if .ACC_ONLY}} -run TestAcc*{{end -}}
 
+
+  test:*:
+
+    vars:
+      TYPE: '{{index .MATCH 0 | lower}}'
+
+    requires:
+      vars:
+        - name: TYPE
+          enum: [unit, acc, all]
+
+    desc: Shortcut command for `task test ACC_ONLY=true`
+
+    cmd: |
+      {{if eq .TYPE "unit" -}}
+        task test
+      {{- else if eq .TYPE "acc" -}}
+        task test ACC_ONLY=true
+      {{- else if eq .TYPE "all" -}}
+        task test ACC=true
+      {{- else -}}
+        echo 'Invalid option {{.TYPE}}'
+      {{- end}}
+
+
   sweep:
     dotenv: [.env]
     cmd: go test ./internal/provider -test.v -args -sweep all
+
+  license:
+    desc: Apply SPDX license headers with copywrite (uses repo config)
+    aliases:
+      - headers
+    cmds:
+      - copywrite headers --config copywrite.hcl -s MPL-2.0 -c "DevOps Wiz"
+
+  release:snapshot:
+    desc: Build snapshot release artifacts with GoReleaser (no publish)
+    aliases:
+      - rel:snap
+    preconditions:
+      - sh: command -v goreleaser >/dev/null 2>&1
+        msg: "goreleaser not found. Install from https://goreleaser.com/install/"
+    cmds:
+      - goreleaser release --snapshot --clean --skip-publish
+
+  release:local:
+    desc: Build local artifacts with GoReleaser (build only)
+    aliases:
+      - rel:local
+    preconditions:
+      - sh: command -v goreleaser >/dev/null 2>&1
+        msg: "goreleaser not found. Install from https://goreleaser.com/install/"
+    cmds:
+      - goreleaser build --snapshot --clean
+
+  precommit:
+    desc: Run pre-commit on all files
+    aliases:
+      - pc
+    preconditions:
+      - sh: command -v pre-commit >/dev/null 2>&1
+        msg: "pre-commit not found. Install from https://pre-commit.com/#install"
+    cmds:
+      - pre-commit run -a

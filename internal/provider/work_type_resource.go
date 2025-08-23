@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
 	"context"
 	"fmt"
-	jira "github.com/ctreminiom/go-atlassian/v2/jira/v3"
+
+	"github.com/ctreminiom/go-atlassian/v2/service/jira"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -17,13 +20,14 @@ var _ resource.ResourceWithValidateConfig = (*workTypeResource)(nil)
 var _ resource.ResourceWithConfigure = (*workTypeResource)(nil)
 var _ resource.ResourceWithImportState = (*workTypeResource)(nil)
 
+// NewWorkTypeResource returns the Terraform resource implementation for jira_work_type.
 func NewWorkTypeResource() resource.Resource {
 	return &workTypeResource{}
 }
 
 type workTypeResource struct {
-	client  *jira.Client
-	premium bool
+	baseJira
+	typeService jira.TypeConnector
 }
 
 func (r *workTypeResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -47,29 +51,30 @@ func (r *workTypeResource) Configure(_ context.Context, req resource.ConfigureRe
 	}
 
 	r.client = provider.client
-	r.premium = provider.premium
+	r.typeService = provider.client.Issue.Type
+	r.providerTimeouts = provider.providerTimeouts
 }
 
 func (r *workTypeResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	if r.premium {
-		return
-	}
-
 	var data workTypeResourceModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	hierarchyLevel := data.HierarchyLevel.ValueInt32()
-
 	if hierarchyLevel != 0 && hierarchyLevel != -1 {
-		resp.Diagnostics.AddAttributeError(path.Root("hierarchy_level"), "Hierarchy Level", fmt.Sprintf("Hierarchy Level is not supported in Standard Jira instances. Hierarchy Level: %d", hierarchyLevel))
+		resp.Diagnostics.AddAttributeError(
+			path.Root("hierarchy_level"),
+			"Hierarchy Level",
+			fmt.Sprintf(
+				"Hierarchy Level %d is not supported on Standard Jira. Allowed values on Standard: -1 (sub-task) or 0 (standard). Levels >= 1 (for example, 1 = Epic) require Jira Software Premium (Advanced Roadmaps). See Atlassian documentation: Issue type hierarchy: https://support.atlassian.com/jira-software-cloud/docs/issue-type-hierarchy/ and Configure issue type hierarchy: https://support.atlassian.com/jira-software-cloud/docs/configure-issue-type-hierarchy/. If you are on Premium, manage hierarchy levels in Jira admin and omit hierarchy_level in Terraform.",
+				int(hierarchyLevel),
+			),
+		)
 		return
 	}
-
 }
 
 func (r *workTypeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -117,21 +122,31 @@ func (r *workTypeResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 }
 
 func (r *workTypeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	CreateResource(ctx, req, resp, &workTypeResourceModel{}, r.client.Issue.Type.Create)
+	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Create)
+	defer cancel()
+	CreateResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Create)
 }
 
 func (r *workTypeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	ReadResource(ctx, req, resp, &workTypeResourceModel{}, r.client.Issue.Type.Get)
+	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
+	defer cancel()
+	ReadResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Get)
 }
 
 func (r *workTypeResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	UpdateResource(ctx, req, resp, &workTypeResourceModel{}, r.client.Issue.Type.Update)
+	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Update)
+	defer cancel()
+	UpdateResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Update)
 }
 
 func (r *workTypeResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	DeleteResource(ctx, req, resp, &workTypeResourceModel{}, r.client.Issue.Type.Delete)
+	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Delete)
+	defer cancel()
+	DeleteResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Delete)
 }
 
 func (r *workTypeResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
-	ImportResource(ctx, request, response, &workTypeResourceModel{}, r.client.Issue.Type.Get)
+	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
+	defer cancel()
+	ImportResource(ctx, request, response, &workTypeResourceModel{}, r.typeService.Get)
 }

@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 
 	"github.com/devops-wiz/terraform-provider-jira/internal/provider"
@@ -16,6 +17,7 @@ var (
 	// these will be set by the goreleaser configuration
 	// to appropriate values for the compiled binary.
 	version = "dev"
+	commit  = "none" // set via -X main.commit by GoReleaser
 
 	// goreleaser can pass other information to the main package, such as the specific commit
 	// https://goreleaser.com/cookbooks/using-main.version/
@@ -37,14 +39,11 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		// TODO: Update this string with the published name of your provider.
-		// Also update the tfplugindocs generate command to either remove the
-		// -provider-name flag or set its value to the updated provider name.
 		Address: "registry.terraform.io/devops-wiz/jira",
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(context.Background(), provider.New(version), opts)
+	err := providerserver.Serve(context.Background(), provider.New(fmt.Sprintf("%s+commit.%s", version, commit)), opts)
 
 	if err != nil {
 		log.Fatal(err.Error())

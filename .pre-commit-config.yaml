@@ -1,0 +1,61 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-added-large-files
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.62.0
+    hooks:
+      - id: golangci-lint
+        args: ["-v"]
+  - repo: local
+    hooks:
+      - id: goimports
+        name: goimports
+        language: system
+        pass_filenames: false
+        entry: "goimports -w"
+        stages: [pre-commit]
+      - id: go-fmt
+        name: go fmt
+        language: system
+        pass_filenames: false
+        entry: "go fmt ./..."
+        stages: [pre-commit]
+      - id: terraform-fmt-examples
+        name: terraform fmt (examples)
+        language: system
+        pass_filenames: false
+        entry: bash
+        args:
+          - -lc
+          - "command -v terraform >/dev/null 2>&1 && terraform fmt -check -recursive examples || { echo 'terraform not installed; skipping terraform fmt check for examples'; exit 0; }"
+        stages: [pre-commit]
+      - id: copywrite-headers
+        name: copywrite headers check
+        language: system
+        pass_filenames: false
+        entry: bash
+        args:
+          - -lc
+          - "copywrite headers --config copywrite.hcl -s MPL-2.0 -c \"DevOps Wiz\""
+        stages: [pre-commit]
+      - id: docs-generate
+        name: docs generation (go generate ./...)
+        language: system
+        pass_filenames: false
+        entry: bash
+        args:
+          - -lc
+          - "go generate ./..."
+        stages: [pre-commit]
+      - id: unit-tests
+        name: go test (unit)
+        language: system
+        pass_filenames: false
+        entry: bash
+        args:
+          - -lc
+          - "go test ./..."
+        stages: [pre-commit]

@@ -1,0 +1,33 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderShortName}}"
+description: |-
+  {{.Description}}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{.Description}}
+
+## Example Usage
+
+{{tffile "examples/resources/jira_project/resource.tf"}}
+
+## Import
+
+You can import a project by its canonical ID or by its key. Using the stable numeric/string ID is recommended to avoid diffs if the key changes.
+
+```sh
+# Import by ID (recommended)
+terraform import jira_project.example 10001
+
+# Import by key (supported by Jira API)
+terraform import jira_project.example ENG
+```
+
+Alternatively, see a runnable script at examples/resources/jira_project/import.sh
+
+## Required Permissions
+
+Creating and deleting projects typically requires Jira Administration permissions on your site. At minimum, the account must have the "Administer Jira" (global) permission and any organization constraints must allow project creation. Consult your organization policy and Atlassian documentation.
+
+{{.SchemaMarkdown}}

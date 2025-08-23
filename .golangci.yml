@@ -1,44 +1,29 @@
-
-
 version: "2"
 linters:
-  default: none
   enable:
     - copyloopvar
     - durationcheck
-    - errcheck
-    - forcetypeassert
-    - godot
-    - ineffassign
     - makezero
     - misspell
     - nilerr
-    - predeclared
-    - staticcheck
+    - prealloc
     - unconvert
     - unparam
-    - unused
-    - usetesting
   exclusions:
     generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
     paths:
+      - scratch
       - third_party$
       - builtin$
       - examples$
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
 formatters:
   enable:
     - gofmt
+    - goimports
   exclusions:
     generated: lax
     paths:
+      - scratch
       - third_party$
       - builtin$
       - examples$

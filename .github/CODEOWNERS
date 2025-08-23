@@ -1,1 +1,5 @@
-* @devops-wiz/pttr.jcb@gmail.com
+# CODEOWNERS
+# Update the owners below to the correct team/user handles for this repository.
+# See https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+* @devops-wiz
