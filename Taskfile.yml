@@ -173,6 +173,8 @@ tasks:
     desc: Run pre-commit on all files
     aliases:
       - pc
+      - check
+      - chk
     preconditions:
       - sh: command -v pre-commit >/dev/null 2>&1
         msg: "pre-commit not found. Install from https://pre-commit.com/#install"
