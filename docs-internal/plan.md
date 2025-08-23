@@ -410,4 +410,3 @@ Phase 4: v1.0 breadth — Not Started
 
 Deliverables
 - Mergeable PRs per workstream with tests and docs; CI green on lint/unit/docs; acceptance as secrets allow.
-

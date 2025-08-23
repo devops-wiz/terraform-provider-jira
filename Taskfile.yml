@@ -136,18 +136,11 @@ tasks:
       {{- else -}}
         echo 'Invalid option {{.TYPE}}'
       {{- end}}
-        
+
 
   sweep:
     dotenv: [.env]
     cmd: go test ./internal/provider -test.v -args -sweep all
-
-  docs:
-    desc: Generate documentation with tfplugindocs
-    aliases:
-      - docs-generate
-    cmds:
-      - tfplugindocs generate
 
   license:
     desc: Apply SPDX license headers with copywrite (uses repo config)
@@ -155,7 +148,6 @@ tasks:
       - headers
     cmds:
       - copywrite headers --config copywrite.hcl -s MPL-2.0 -c "DevOps Wiz"
-
 
   release:snapshot:
     desc: Build snapshot release artifacts with GoReleaser (no publish)

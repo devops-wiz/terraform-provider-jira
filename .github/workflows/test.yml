@@ -63,7 +63,6 @@ jobs:
   acc_test:
     name: Terraform Provider Acceptance Tests
     needs: build_test
-    if: ${{ secrets.JIRA_API_EMAIL != '' && secrets.JIRA_API_TOKEN != '' && vars.JIRA_ENDPOINT != '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -98,4 +97,5 @@ jobs:
           JIRA_ENDPOINT: ${{ vars.JIRA_ENDPOINT }}
           JIRA_API_EMAIL: ${{ secrets.JIRA_API_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT_TEST_ROLE_LEAD_ID: ${{ secrets.JIRA_PROJECT_TEST_ROLE_LEAD_ID }}
         run: task test ACC_ONLY=true

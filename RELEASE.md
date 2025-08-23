@@ -48,9 +48,9 @@ Before tagging (PR checklist):
 - [ ] All CI jobs green (lint, build, unit tests, docs sync).
 - [ ] Acceptance tests passed (can run locally with `.env`): `task test ACC=true`.
 - [ ] CHANGELOG.md updated with entries for the release. Copy the Release Drafter draft notes into a new section:
-  
+
   ## vX.Y.Z - YYYY-MM-DD
-  
+
   and ensure categories follow Keep a Changelog.
 - [ ] Examples and docs are up-to-date: `task gen` and commit any `docs/` changes if schema changed.
 - [ ] Dependency hygiene: `go mod tidy` clean.
@@ -98,4 +98,3 @@ Manual/Local build (no publish):
 ## 8) Scope and Ownership
 - Keep release-related changes scoped. Avoid drive-by refactors during release prep.
 - Ensure security posture: no secrets in logs, redact sensitive fields in any diagnostics.
-

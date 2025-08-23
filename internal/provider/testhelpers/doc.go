@@ -1,3 +1,6 @@
+// Copyright (c) DevOps Wiz
+// SPDX-License-Identifier: MPL-2.0
+
 // Package testhelpers provides shared testing utilities used across unit and
 // acceptance tests.
 //

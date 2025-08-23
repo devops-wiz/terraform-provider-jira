@@ -39,3 +39,5 @@ website/vendor
 http-client.env.json
 http-client.private.env.json
 /docs-internal/openapi/swagger-v3.v3.json
+/.junie/
+/http/

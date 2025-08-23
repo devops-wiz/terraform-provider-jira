@@ -282,7 +282,7 @@ func TestResponseDebugInfo_HTTPHeader(t *testing.T) {
 	}
 	found := false
 	for _, h := range headers {
-		if strings.Contains(h, "X-Ratelimit-Window=60") {
+		if strings.Contains(h, "X-RateLimit-Window=60") {
 			found = true
 			break
 		}

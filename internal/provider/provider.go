@@ -1,3 +1,6 @@
+// Copyright (c) DevOps Wiz
+// SPDX-License-Identifier: MPL-2.0
+
 package provider
 
 import (
@@ -306,6 +309,7 @@ func (j *JiraProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewWorkTypeResource,
 		NewWorkflowStatusResource,
+		NewProjectResource,
 	}
 }
 

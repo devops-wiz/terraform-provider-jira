@@ -22,5 +22,5 @@ jobs:
       - name: Check headers for Go files (SPDX MPL-2.0)
         shell: bash
         run: |
-          $(go env GOPATH)/bin/copywrite headers
+          $(go env GOPATH)/bin/copywrite headers --config copywrite.hcl -s MPL-2.0 -c "DevOps Wiz"
           git diff --exit-code

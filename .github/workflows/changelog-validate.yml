@@ -4,10 +4,7 @@ name: Validate CHANGELOG on tag
 on:
   push:
     tags:
-      - 'v*.*.*'
-      - 'v*.*.*-*'
-      - 'v*.*.*+*'
-      - 'v*.*.*-*+*'
+      - 'v*'
 
 jobs:
   changelog-validate:

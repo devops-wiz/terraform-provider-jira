@@ -1,23 +1,29 @@
-
+version: "2"
 linters:
   enable:
-    - errcheck
-    - staticcheck
-    - govet
-    - ineffassign
-    - unused
+    - copyloopvar
+    - durationcheck
+    - makezero
     - misspell
+    - nilerr
+    - prealloc
+    - unconvert
+    - unparam
+  exclusions:
+    generated: lax
+    paths:
+      - scratch
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
     - gofmt
     - goimports
-    - unparam
-    - unconvert
-    - prealloc
-    - makezero
-    - nilerr
-    - durationcheck
-    - copyloopvar
-
-issues:
-  exclude-use-default: false
-  exclude-dirs:
-    - scratch
+  exclusions:
+    generated: lax
+    paths:
+      - scratch
+      - third_party$
+      - builtin$
+      - examples$

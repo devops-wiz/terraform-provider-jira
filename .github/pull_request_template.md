@@ -16,7 +16,7 @@ Example: feat(provider): add configurable HTTP timeouts
 ## Changes
 
 <!-- High-level list of changes. Keep concise. -->
-- 
+-
 
 ## Docs
 
@@ -51,7 +51,7 @@ Categories follow Keep a Changelog: added | changed | deprecated | removed | fix
 
 - Category: added | changed | deprecated | removed | fixed | security
 - Release note (concise, user-facing):
-  - 
+  -
 - Breaking change: Yes/No
 - Upgrade notes (if breaking):
 

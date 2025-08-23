@@ -94,7 +94,7 @@ func MkRSWithBodyAndHeaders(code int, hdr http.Header, body string) *models.Resp
 	buf.WriteString(body)
 	rs := &models.ResponseScheme{Code: code, Response: &http.Response{StatusCode: code, Header: http.Header{}}, Bytes: buf}
 	for k, v := range hdr {
-		rs.Response.Header[k] = v
+		rs.Header[k] = v
 	}
 	return rs
 }
@@ -112,7 +112,7 @@ func MkRS(code int, headers http.Header, body string) *models.ResponseScheme {
 	}
 
 	for k, v := range headers {
-		rs.Response.Header[k] = v
+		rs.Header[k] = v
 	}
 
 	return rs

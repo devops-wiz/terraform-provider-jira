@@ -386,7 +386,7 @@ Notes
   - Mitigation: central backoff, scheduled acceptance tests, and tuned concurrency.
 - Breaking changes in go-atlassian:
   - Mitigation: pin versions, isolate usage via wrapper, add upgrade tests.
-  
+
 ## 20. Implementation notes
 - Shared client wrapper encapsulates client construction, retries, and model/state mapping.
 - Provider configuration validates auth_method and marks credentials as sensitive.

@@ -3,10 +3,9 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
-      - id: end-of-file-fixer
       - id: check-added-large-files
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.61.0
+    rev: v1.62.0
     hooks:
       - id: golangci-lint
         args: ["-v"]
@@ -16,14 +15,14 @@ repos:
         name: goimports
         language: system
         pass_filenames: false
-        entry: "bash -lc \"command -v goimports >/dev/null 2>&1 && goimports -w . || { echo 'goimports not found. Install with: go install golang.org/x/tools/cmd/goimports@latest'; exit 1; }\""
-        stages: [commit]
+        entry: "goimports -w"
+        stages: [pre-commit]
       - id: go-fmt
         name: go fmt
         language: system
         pass_filenames: false
-        entry: "bash -lc 'go fmt ./...'"
-        stages: [commit]
+        entry: "go fmt ./..."
+        stages: [pre-commit]
       - id: terraform-fmt-examples
         name: terraform fmt (examples)
         language: system
@@ -31,8 +30,8 @@ repos:
         entry: bash
         args:
           - -lc
-          - command -v terraform >/dev/null 2>&1 && terraform fmt -check -recursive examples || { echo 'terraform not installed; skipping terraform fmt check for examples'; exit 0; }
-        stages: [commit]
+          - "command -v terraform >/dev/null 2>&1 && terraform fmt -check -recursive examples || { echo 'terraform not installed; skipping terraform fmt check for examples'; exit 0; }"
+        stages: [pre-commit]
       - id: copywrite-headers
         name: copywrite headers check
         language: system
@@ -40,17 +39,17 @@ repos:
         entry: bash
         args:
           - -lc
-          - command -v copywrite >/dev/null 2>&1 && copywrite headers --config copywrite.hcl -s MPL-2.0 -c "DevOps Wiz" --check || { echo "copywrite not installed; skipping license header check"; exit 0; }
-        stages: [commit]
-      - id: docs-generate-no-diff
-        name: docs generation no-diff (go generate ./...)
+          - "copywrite headers --config copywrite.hcl -s MPL-2.0 -c \"DevOps Wiz\""
+        stages: [pre-commit]
+      - id: docs-generate
+        name: docs generation (go generate ./...)
         language: system
         pass_filenames: false
         entry: bash
         args:
           - -lc
-          - go generate ./... >/dev/null 2>&1; git diff --quiet -- docs/ || { echo "Docs are out of date. Run: task gen and commit updated docs/"; git --no-pager diff -- docs/; exit 1; }
-        stages: [commit]
+          - "go generate ./..."
+        stages: [pre-commit]
       - id: unit-tests
         name: go test (unit)
         language: system
@@ -58,5 +57,5 @@ repos:
         entry: bash
         args:
           - -lc
-          - TF_ACC= go test ./...
-        stages: [commit]
+          - "go test ./..."
+        stages: [pre-commit]

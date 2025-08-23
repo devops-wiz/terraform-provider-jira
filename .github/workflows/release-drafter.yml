@@ -6,9 +6,6 @@ on:
     # Trigger on all branches; restrict execution to the default branch at job-level.
     branches:
       - '**'
-  pull_request:
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled, closed]
-  workflow_dispatch:
 
 permissions:
   contents: write
