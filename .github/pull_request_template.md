@@ -79,15 +79,6 @@ Categories follow Keep a Changelog: added | changed | deprecated | removed | fix
 ### Scope gating (optional)
 - [ ] Docs/CI-only: this PR changes only docs/CI/chore files (no `**/*.go`, `go.mod`, `go.sum`, `internal/**`, `main.go`, or `templates/**/*.md.tmpl`; Taskfile behavior unchanged). Safe to skip Go/TFPF checks; maintainers may still request full runs.
 
-## Labels
-
-<!-- Apply labels to help triage and release notes. -->
-- Type (choose one): `type:feat` | `type:fix` | `type:docs` | `type:refactor` | `type:test` | `type:chore`
-- Area (as applicable): `area:provider` | `area:docs` | `area:resource:<name>` | `area:data-source:<name>`
-- Release notes: exactly one of `release-note` (user-facing) OR `skip-release-notes` (no user-facing change)
-- Breaking change: add `breaking-change` (and ensure upgrade notes above)
-- If unsure, add `triage:needs-category` and a maintainer will adjust.
-
 ## Reviewer Notes
 
 <!-- Call out areas that need extra attention, trade-offs made, or follow-ups planned. -->
