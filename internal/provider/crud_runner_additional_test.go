@@ -25,7 +25,7 @@ func TestCRUDRunner_DoRead_getStateError_ShortCircuits(t *testing.T) {
 	apiReadCalls := 0
 	ensureCalls := 0
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIRead: func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			apiReadCalls++
 			return &models.IssueTypeScheme{ID: id}, testhelpers.MkRS(200, nil, ""), nil
@@ -71,7 +71,7 @@ func TestCRUDRunner_DoUpdate_getPlanError_ShortCircuits(t *testing.T) {
 	buildCalls := 0
 	ensureCalls := 0
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			buildCalls++
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
@@ -118,7 +118,7 @@ func TestCRUDRunner_DoDelete_getStateError_ShortCircuits(t *testing.T) {
 	apiDelCalls := 0
 	ensureCalls := 0
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIDelete: func(ctx context.Context, id string) (*models.ResponseScheme, error) {
 			apiDelCalls++
 			return testhelpers.MkRS(204, nil, ""), nil
@@ -157,7 +157,7 @@ func TestCRUDRunner_Create_APICreate_NilResponse_WithError(t *testing.T) {
 	var diags diag.Diagnostics
 	mapCalls := 0
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},

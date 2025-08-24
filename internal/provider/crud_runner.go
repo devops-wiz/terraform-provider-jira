@@ -23,18 +23,18 @@ import (
 
 // PayloadBuilderFunc builds the API payload (TPayload) from the planned Terraform state (TState).
 // Return diagnostics for validation or value derivation errors encountered during build.
-type PayloadBuilderFunc[TState StateConstraint, TPayload PayloadConstraint] func(ctx context.Context, st *TState) (*TPayload, diag.Diagnostics)
+type PayloadBuilderFunc[TState StateConstraint, TPayload PayloadConstraint] func(ctx context.Context, st *TState) (TPayload, diag.Diagnostics)
 
 // CreateFunc invokes the concrete API Create call and returns the created API model (TAPI).
 // The models.ResponseScheme is threaded for Ensure* handling (status/body diagnostics).
-type CreateFunc[TPayload PayloadConstraint, TAPI APIConstraint] func(ctx context.Context, p *TPayload) (api TAPI, apiResp *models.ResponseScheme, err error)
+type CreateFunc[TPayload PayloadConstraint, TAPI APIConstraint] func(ctx context.Context, p TPayload) (api TAPI, apiResp *models.ResponseScheme, err error)
 
 // ReadFunc invokes the concrete API Read/Get call using a stable identifier and returns TAPI.
 type ReadFunc[TAPI APIConstraint] func(ctx context.Context, id string) (api TAPI, apiResp *models.ResponseScheme, err error)
 
 // UpdateFunc invokes the concrete API Update call with payload and returns the refreshed TAPI.
 // Some services may issue Update → Get to return a full object; both patterns are supported.
-type UpdateFunc[TPayload PayloadConstraint, TAPI APIConstraint] func(ctx context.Context, id string, p *TPayload) (api TAPI, apiResp *models.ResponseScheme, err error)
+type UpdateFunc[TPayload PayloadConstraint, TAPI APIConstraint] func(ctx context.Context, id string, p TPayload) (api TAPI, apiResp *models.ResponseScheme, err error)
 
 // DeleteFunc invokes the concrete API Delete call; Ensure* handles status evaluation and 404 semantics.
 type DeleteFunc func(ctx context.Context, id string) (apiResp *models.ResponseScheme, err error)
@@ -68,17 +68,26 @@ type PostCreateReadFunc[TState StateConstraint, TAPI APIConstraint] func(ctx con
 
 // StateConstraint enumerates the Terraform state models supported by the CRUD runner.
 type StateConstraint interface {
-	projectResourceModel | workTypeResourceModel | projectCategoryResourceModel
+	projectResourceModel |
+		workTypeResourceModel |
+		projectCategoryResourceModel |
+		fieldResourceModel
 }
 
 // PayloadConstraint enumerates the supported go‑atlassian payload types used in Create/Update.
 type PayloadConstraint interface {
-	models.ProjectPayloadScheme | models.IssueTypePayloadScheme | models.ProjectCategoryPayloadScheme
+	*models.ProjectPayloadScheme |
+		*models.IssueTypePayloadScheme |
+		*models.ProjectCategoryPayloadScheme |
+		*models.CustomFieldScheme
 }
 
 // APIConstraint enumerates the supported go‑atlassian API models returned by service calls.
 type APIConstraint interface {
-	*models.ProjectScheme | *models.IssueTypeScheme | *models.ProjectCategoryScheme
+	*models.ProjectScheme |
+		*models.IssueTypeScheme |
+		*models.ProjectCategoryScheme |
+		*models.IssueFieldScheme
 }
 
 // CRUDHooks defines per‑resource behavior consumed by the generic runner.

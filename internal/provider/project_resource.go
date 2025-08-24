@@ -128,8 +128,8 @@ func (r *projectResource) deleteProject(ctx context.Context, id string) (*models
 }
 
 // hooks returns the CRUD hooks for the generic runner.
-func (r *projectResource) hooks() CRUDHooks[projectResourceModel, models.ProjectPayloadScheme, *models.ProjectScheme] {
-	return CRUDHooks[projectResourceModel, models.ProjectPayloadScheme, *models.ProjectScheme]{
+func (r *projectResource) hooks() CRUDHooks[projectResourceModel, *models.ProjectPayloadScheme, *models.ProjectScheme] {
+	return CRUDHooks[projectResourceModel, *models.ProjectPayloadScheme, *models.ProjectScheme]{
 		BuildPayload: func(ctx context.Context, st *projectResourceModel) (*models.ProjectPayloadScheme, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			p := &models.ProjectPayloadScheme{

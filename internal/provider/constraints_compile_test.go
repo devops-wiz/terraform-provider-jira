@@ -13,9 +13,9 @@ import (
 
 // CRUDRunner instantiations (state, payload, api)
 var (
-	_ CRUDRunner[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]
-	_ CRUDRunner[projectResourceModel, models.ProjectPayloadScheme, *models.ProjectScheme]
-	_ CRUDRunner[projectCategoryResourceModel, models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]
+	_ CRUDRunner[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]
+	_ CRUDRunner[projectResourceModel, *models.ProjectPayloadScheme, *models.ProjectScheme]
+	_ CRUDRunner[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]
 )
 
 // DoImport instantiations (state, api)

@@ -26,7 +26,7 @@ func TestCRUDRunner_Create_Update_Delete_Read_HappyPaths(t *testing.T) {
 	var mapCalls int
 	var setCalls int
 	var diags diag.Diagnostics
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, diag.Diagnostics{}
 		},
@@ -119,7 +119,7 @@ func TestCRUDRunner_Create_Update_Delete_Read_HappyPaths(t *testing.T) {
 func TestCRUDRunner_Delete_404_TreatedAsSuccess(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{}, nil
 		},
@@ -152,7 +152,7 @@ func TestCRUDRunner_MapToStateError_Propagates(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
 	var mapCalls int
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{}, nil
 		},
@@ -197,7 +197,7 @@ func TestCRUDRunner_Read_404_RemovesState_NoError(t *testing.T) {
 	var mapCalls int
 	removed := false
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{}, nil
 		},
@@ -250,7 +250,7 @@ func TestCRUDRunner_PostCreateRead_CalledAndMapped(t *testing.T) {
 	postReadCalled := false
 	var finalID string
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -306,7 +306,7 @@ func TestCRUDRunner_StatusOverrides_201_204_Success(t *testing.T) {
 	var diags diag.Diagnostics
 	var mapCalls int
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -365,7 +365,7 @@ func TestCRUDRunner_EnsureFailure_AppendsDiagnostics(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -397,7 +397,7 @@ func TestCRUDRunner_BuildPayloadError_Propagates_NoAPICall(t *testing.T) {
 	var diags diag.Diagnostics
 	var createCalls int
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			var d diag.Diagnostics
 			d.AddError("build error", "payload invalid")
@@ -434,7 +434,7 @@ func TestCRUDRunner_BuildPayloadWarnings_Create_Proceeds(t *testing.T) {
 	var diags diag.Diagnostics
 	var createCalls int
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			var d diag.Diagnostics
 			d.AddWarning("warn", "non-fatal warning during build")
@@ -475,7 +475,7 @@ func TestCRUDRunner_BuildPayloadWarnings_Update_Proceeds(t *testing.T) {
 	var diags diag.Diagnostics
 	var updateCalls int
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			var d diag.Diagnostics
 			d.AddWarning("warn", "non-fatal warning during build")
@@ -522,7 +522,7 @@ func TestCRUDRunner_EnsureAndAPIErrorHandling_AllOps(t *testing.T) {
 
 	// Create: APICreate err + 500 → ensure false; no map
 	mapCalls := 0
-	hCreate := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hCreate := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -551,7 +551,7 @@ func TestCRUDRunner_EnsureAndAPIErrorHandling_AllOps(t *testing.T) {
 	// Read: APIRead network error
 	diags = diag.Diagnostics{}
 	setCalls := 0
-	hRead := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hRead := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIRead: func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			return nil, testhelpers.MkRS(500, nil, "oops"), errors.New("net err")
 		},
@@ -582,7 +582,7 @@ func TestCRUDRunner_EnsureAndAPIErrorHandling_AllOps(t *testing.T) {
 	// Update: 500
 	diags = diag.Diagnostics{}
 	mapCalls = 0
-	hUpdate := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hUpdate := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -613,7 +613,7 @@ func TestCRUDRunner_EnsureAndAPIErrorHandling_AllOps(t *testing.T) {
 
 	// Delete: err + 500
 	diags = diag.Diagnostics{}
-	hDelete := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hDelete := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIDelete: func(ctx context.Context, id string) (*models.ResponseScheme, error) {
 			return testhelpers.MkRS(500, nil, "err"), errors.New("delete failed")
 		},
@@ -638,7 +638,7 @@ func TestCRUDRunner_EnsureAndAPIErrorHandling_AllOps(t *testing.T) {
 func TestCRUDRunner_Delete_Accepts202_WithOverride(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIDelete: func(ctx context.Context, id string) (*models.ResponseScheme, error) {
 			return testhelpers.MkRS(202, nil, ""), nil
 		},
@@ -664,7 +664,7 @@ func TestCRUDRunner_Delete_Accepts202_WithOverride(t *testing.T) {
 func TestCRUDRunner_StatusOverrideMismatch_Fails(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -693,7 +693,7 @@ func TestCRUDRunner_Read_403_Forbidden_NoRemove(t *testing.T) {
 	var diags diag.Diagnostics
 	removed := false
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIRead: func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			return nil, testhelpers.MkRS(403, nil, "forbidden"), nil
 		},
@@ -726,7 +726,7 @@ func TestCRUDRunner_PostCreateRead_Error_NoMapSet(t *testing.T) {
 	var diags diag.Diagnostics
 	var mapCalls, setCalls, ensureCalls int
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -770,7 +770,7 @@ func TestCRUDRunner_PostCreateRead_Maps_InvalidModel_ErrorPropagates(t *testing.
 	ctx := context.Background()
 	var diags diag.Diagnostics
 
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -803,7 +803,7 @@ func TestCRUDRunner_ExtractID_Empty_Read_Delete(t *testing.T) {
 	var diags diag.Diagnostics
 
 	// Read with empty id
-	hRead := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hRead := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIRead: func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			if id != "" {
 				t.Fatalf("expected empty id, got %q", id)
@@ -829,7 +829,7 @@ func TestCRUDRunner_ExtractID_Empty_Read_Delete(t *testing.T) {
 
 	// Delete with empty id
 	diags = diag.Diagnostics{}
-	hDel := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hDel := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIDelete: func(ctx context.Context, id string) (*models.ResponseScheme, error) {
 			if id != "" {
 				t.Fatalf("expected empty id for delete, got %q", id)
@@ -855,7 +855,7 @@ func TestCRUDRunner_Read_MapError_And_Update_SetStateError(t *testing.T) {
 	ctx := context.Background()
 
 	// Read MapToState error
-	hRead := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hRead := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		APIRead: func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			return &models.IssueTypeScheme{ID: id}, testhelpers.MkRS(200, nil, ""), nil
 		},
@@ -886,7 +886,7 @@ func TestCRUDRunner_Read_MapError_And_Update_SetStateError(t *testing.T) {
 
 	// Update setState error
 	var diags diag.Diagnostics
-	hUpdate := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	hUpdate := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},
@@ -994,7 +994,7 @@ func TestCRUDRunner_EnsureActionStrings_AreCorrect(t *testing.T) {
 	}
 
 	// Hooks to succeed and trigger post-create read
-	h := CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+	h := CRUDHooks[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
 		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
 			return &models.IssueTypePayloadScheme{Name: "n"}, nil
 		},

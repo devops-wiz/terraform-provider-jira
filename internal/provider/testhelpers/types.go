@@ -62,3 +62,10 @@ type DataProjectsCfg struct {
 	DataName         string
 	LookupBy         string
 }
+
+// fieldTemplateData represents the structure for storing field information such as name, type, and description.
+type FieldTemplateData struct {
+	Name        string
+	FieldType   string
+	Description string
+}

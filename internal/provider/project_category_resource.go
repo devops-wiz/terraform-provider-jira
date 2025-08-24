@@ -224,8 +224,8 @@ func (r *projectCategoryResource) ImportState(ctx context.Context, request resou
 }
 
 // hooks returns the CRUD hooks for the generic runner.
-func (r *projectCategoryResource) hooks() CRUDHooks[projectCategoryResourceModel, models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme] {
-	return CRUDHooks[projectCategoryResourceModel, models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]{
+func (r *projectCategoryResource) hooks() CRUDHooks[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme] {
+	return CRUDHooks[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]{
 		BuildPayload: func(ctx context.Context, st *projectCategoryResourceModel) (*models.ProjectCategoryPayloadScheme, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			p := &models.ProjectCategoryPayloadScheme{

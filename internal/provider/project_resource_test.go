@@ -48,14 +48,14 @@ func TestAccProjectResource_basic(t *testing.T) {
 
 	projectType := "software"
 	updatedDesc := "Updated project description"
-	leadAccountID := testhelpers.TestAccLeadAccountID()
+	leadAccountID := testhelpers.GetTestProjLeadAcctIdFromEnv()
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testhelpers.TestAccProjectResourceConfig(t, key, name, projectType, leadAccountID, ""),
+				Config: testhelpers.GetProjCfgStr(t, key, name, projectType, leadAccountID, ""),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("key"), knownvalue.StringExact(key)),
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(name)),
@@ -63,7 +63,7 @@ func TestAccProjectResource_basic(t *testing.T) {
 				},
 			},
 			{
-				Config: testhelpers.TestAccProjectResourceConfig(t, key, name, projectType, leadAccountID, updatedDesc),
+				Config: testhelpers.GetProjCfgStr(t, key, name, projectType, leadAccountID, updatedDesc),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("description"), knownvalue.StringExact(updatedDesc)),
 				},

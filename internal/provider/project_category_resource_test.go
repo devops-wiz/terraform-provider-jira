@@ -26,13 +26,13 @@ func TestAccProjectCategoryResource_basic(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testhelpers.TestAccProjectCategoryConfig(t, name, ""),
+				Config: testhelpers.GetProjCatCfg(t, name, ""),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(name)),
 				},
 			},
 			{
-				Config: testhelpers.TestAccProjectCategoryConfig(t, name, updatedDesc),
+				Config: testhelpers.GetProjCatCfg(t, name, updatedDesc),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("description"), knownvalue.StringExact(updatedDesc)),
 				},
