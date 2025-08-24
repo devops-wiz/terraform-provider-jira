@@ -1,0 +1,7 @@
+resource "jira_field" "test" {
+  name       = "{{.Name}}"
+  field_type = "{{.FieldType}}"
+  {{- if .Description}}
+  description = "{{.Description}}"
+  {{- end}}
+}
