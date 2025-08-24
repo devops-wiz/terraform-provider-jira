@@ -1,0 +1,28 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderShortName}}"
+description: |-
+  {{.Description}}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{.Description}}
+
+## Example Usage
+
+{{tffile "examples/resources/jira_field/resource.tf"}}
+
+## Import
+
+You can import a custom field by its canonical ID (e.g., customfield_10001).
+
+```sh
+# Import by ID (recommended)
+terraform import jira_field.example customfield_10001
+```
+
+## Required Permissions
+
+Creating and deleting custom fields typically requires Jira Administration permissions. Ensure the account has the "Administer Jira" (global) permission.
+
+{{.SchemaMarkdown}}
