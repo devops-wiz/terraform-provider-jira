@@ -79,3 +79,17 @@ func uniqueStrings(in []string) []string {
 	}
 	return out
 }
+
+// getFieldTypeShort maps an API field type value to its corresponding short field type key from the fieldTypesMap.
+func getFieldTypeShort(apiValue string) string {
+	var matchingKey string
+
+	for key, spec := range fieldTypesMap {
+		if spec.Value == apiValue {
+			matchingKey = key
+			break
+		}
+	}
+
+	return matchingKey
+}

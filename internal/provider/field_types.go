@@ -4,10 +4,13 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -21,12 +24,20 @@ type fieldResourceModel struct {
 
 // GetAPIPayload converts the Terraform plan into the API payload for creating/updating a field.
 func (m *fieldResourceModel) GetAPIPayload(_ context.Context) (createPayload *models.CustomFieldScheme, diags diag.Diagnostics) {
-	payload := &models.CustomFieldScheme{
-		Name:        m.Name.ValueString(),
-		Description: m.Description.ValueString(),
-		FieldType:   m.FieldType.ValueString(),
+	if mapVal, ok := fieldTypesMap[m.FieldType.ValueString()]; ok {
+		createPayload = &models.CustomFieldScheme{
+			Name:        m.Name.ValueString(),
+			Description: m.Description.ValueString(),
+			FieldType:   mapVal.Value,
+			SearcherKey: mapVal.SearcherKey,
+		}
+		return createPayload, diags
+	} else {
+		diags = diag.Diagnostics{}
+		diags.AddAttributeError(path.Root("field_type"), "Invalid Field Type", fmt.Sprintf("Field type: %s is not valid. Valid types include:\n%s", m.FieldType.ValueString(), strings.Join(fieldTypeKeys, "\n")))
+		return createPayload, diags
 	}
-	return payload, nil
+
 }
 
 // GetID returns the stable identifier of the field.
@@ -45,7 +56,7 @@ func (m *fieldResourceModel) TransformToState(_ context.Context, apiModel *model
 		ID:          types.StringValue(apiModel.ID),
 		Name:        types.StringValue(apiModel.Name),
 		Description: m.Description,
-		FieldType:   m.FieldType, // keep
+		FieldType:   types.StringValue(getFieldTypeShort(apiModel.Schema.Custom)),
 	}
 	if apiModel.Description != "" {
 		newState.Description = types.StringValue(apiModel.Description)

@@ -5,8 +5,12 @@ package provider
 
 import (
 	"bytes"
+	"fmt"
+	"slices"
 	"testing"
 	"text/template"
+
+	"maps"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -34,7 +38,7 @@ func TestAccFieldResource_basic(t *testing.T) {
 		t.Parallel()
 
 		name := acctest.RandomWithPrefix("tf-acc-field")
-		fieldType := "com.atlassian.jira.plugin.system.customfieldtypes:textfield"
+		fieldType := "textfield" // use key as validated by schema
 		updatedDesc := "Updated field description"
 
 		initial := fieldTemplateData{Name: name, FieldType: fieldType}
@@ -66,6 +70,54 @@ func TestAccFieldResource_basic(t *testing.T) {
 			},
 		})
 	})
+}
+
+// TestAccFieldResource_variousTypes creates and imports fields for a selection of supported custom field types.
+// To keep runtime reasonable, this test creates each type sequentially in its own step.
+func TestAccFieldResource_variousTypes(t *testing.T) {
+	t.Parallel()
+
+	// Determine a deterministic, alphabetically-sorted set of field type keys.
+	allKeys := slices.Sorted(maps.Keys(fieldTypesMap))
+
+	// Optionally limit the number of tested types to avoid excessive runtime in CI. Adjust as needed.
+	// Keeping full coverage by default since provider limits are modest; tweak slice below to reduce.
+	keysToTest := allKeys
+
+	for _, k := range keysToTest {
+		// Capture loop variable
+		typ := k
+
+		t.Run(fmt.Sprintf("type=%s", typ), func(t *testing.T) {
+			// Do not run subtests in parallel to avoid noisy flakiness/rate limits against Jira API.
+			rName := "jira_field.test"
+			name := acctest.RandomWithPrefix("tf-acc-field-" + typ)
+
+			cfg := fieldTemplateData{
+				Name:      name,
+				FieldType: typ, // schema validates keys, provider maps to API value internally
+			}
+
+			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testAccPreCheck(t) },
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Steps: []resource.TestStep{
+					{
+						Config: testAccFieldResourceConfig(t, cfg),
+						ConfigStateChecks: []statecheck.StateCheck{
+							statecheck.ExpectKnownValue(rName, tfjsonpath.New("name"), knownvalue.StringExact(name)),
+							statecheck.ExpectKnownValue(rName, tfjsonpath.New("field_type"), knownvalue.StringExact(typ)),
+						},
+					},
+					{
+						ImportState:     true,
+						ImportStateKind: resource.ImportCommandWithID,
+						ResourceName:    rName,
+					},
+				},
+			})
+		})
+	}
 }
 
 // testAccFieldResourceConfig generates a Terraform field resource configuration using the provided template data.
