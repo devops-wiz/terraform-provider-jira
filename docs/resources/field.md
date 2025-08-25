@@ -43,7 +43,6 @@ Creating and deleting custom fields typically requires Jira Administration permi
 		* datetime
 		* float
 		* grouppicker
-		* importid
 		* labels
 		* multicheckboxes
 		* multigrouppicker
@@ -64,6 +63,7 @@ Creating and deleting custom fields typically requires Jira Administration permi
 ### Optional
 
 - `description` (String) A description of the field.
+- `trash_on_destroy` (Boolean) If set to `false` (default: `true`), the field will be fully deleted from API side when terraform destroys the resource, as opposed to moving to the trash.
 
 ### Read-Only
 

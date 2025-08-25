@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,10 +15,11 @@ import (
 
 // fieldResourceModel represents the Terraform schema model for jira_field.
 type fieldResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	FieldType   types.String `tfsdk:"field_type"`
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	FieldType      types.String `tfsdk:"field_type"`
+	TrashOnDestroy types.Bool   `tfsdk:"trash_on_destroy"`
 }
 
 // GetAPIPayload converts the Terraform plan into the API payload for creating/updating a field.
@@ -51,25 +51,16 @@ func (m *fieldResourceModel) TransformToState(_ context.Context, apiModel *model
 		return diag.Diagnostics{diag.NewErrorDiagnostic("Empty API model", "The Jira API returned no field payload to map into state.")}
 	}
 
-	// Preserve FieldType already in m
 	newState := fieldResourceModel{
-		ID:          types.StringValue(apiModel.ID),
-		Name:        types.StringValue(apiModel.Name),
-		Description: m.Description,
-		FieldType:   types.StringValue(getFieldTypeShort(apiModel.Schema.Custom)),
+		ID:             types.StringValue(apiModel.ID),
+		Name:           types.StringValue(apiModel.Name),
+		FieldType:      types.StringValue(getFieldTypeShort(apiModel.Schema.Custom)),
+		Description:    m.Description,
+		TrashOnDestroy: m.TrashOnDestroy,
 	}
 	if apiModel.Description != "" {
 		newState.Description = types.StringValue(apiModel.Description)
 	}
 	*m = newState
 	return nil
-}
-
-func (m *fieldResourceModel) AttributeTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		"id":          types.StringType,
-		"name":        types.StringType,
-		"description": types.StringType,
-		"field_type":  types.StringType,
-	}
 }
