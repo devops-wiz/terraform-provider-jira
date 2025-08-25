@@ -11,8 +11,10 @@ import (
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/ctreminiom/go-atlassian/v2/service/jira"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -33,7 +35,8 @@ func NewFieldResource() resource.Resource { return &fieldResource{} }
 // fieldResource represents a Terraform resource responsible for managing Jira custom fields globally.
 type fieldResource struct {
 	baseJira
-	fieldService jira.FieldConnector
+	fieldService      jira.FieldConnector
+	fieldTrashService jira.FieldTrashConnector
 }
 
 // Metadata sets the type name for the resource using the provider's type name concatenated with "_field".
@@ -58,6 +61,7 @@ func (r *fieldResource) Configure(_ context.Context, req resource.ConfigureReque
 
 	r.client = provider.client
 	r.fieldService = provider.client.Issue.Field
+	r.fieldTrashService = provider.client.Issue.Field.Trash
 	r.providerTimeouts = provider.providerTimeouts
 }
 
@@ -91,6 +95,13 @@ func (r *fieldResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 					stringvalidator.OneOf(fieldTypeKeys...),
 				},
 			},
+			"trash_on_destroy": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				MarkdownDescription: "If set to `false` (default: `true`), the field will be fully deleted from API side " +
+					"when terraform destroys the resource, as opposed to moving to the trash.",
+				Default: booldefault.StaticBool(true),
+			},
 		},
 	}
 }
@@ -99,7 +110,7 @@ func (r *fieldResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 func (r *fieldResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Create)
 	defer cancel()
-	CreateResource[*models.CustomFieldScheme, *models.IssueFieldScheme](ctx, req, resp, &fieldResourceModel{}, r.fieldService.Create)
+	CreateResource(ctx, req, resp, &fieldResourceModel{}, r.fieldService.Create)
 }
 
 // lookupFieldByID searches for a Jira issue field by its ID with retries, due to eventual consistency in the Jira API.
@@ -165,7 +176,7 @@ func (r *fieldResource) updateField(ctx context.Context, id string, updatedResou
 func (r *fieldResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Update)
 	defer cancel()
-	UpdateResource[*models.CustomFieldScheme, *models.IssueFieldScheme](ctx, req, resp, &fieldResourceModel{}, r.updateField)
+	UpdateResource(ctx, req, resp, &fieldResourceModel{}, r.updateField)
 }
 
 // deleteField deletes a custom field in Jira using its unique identifier and returns the API response or an error.
@@ -178,12 +189,25 @@ func (r *fieldResource) deleteField(ctx context.Context, id string) (*models.Res
 func (r *fieldResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Delete)
 	defer cancel()
-	DeleteResource(ctx, req, resp, &fieldResourceModel{}, r.deleteField)
+
+	var trashOnDelete bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("trash_on_destroy"), &trashOnDelete)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if trashOnDelete {
+		DeleteResource(ctx, req, resp, &fieldResourceModel{}, r.fieldTrashService.Move)
+	} else {
+		DeleteResource(ctx, req, resp, &fieldResourceModel{}, r.deleteField)
+	}
+
 }
 
 // ImportState imports the resource's state into Terraform by fetching the resource from the API using its ID.
 func (r *fieldResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
-	ImportResource[*models.IssueFieldScheme](ctx, request, response, &fieldResourceModel{}, r.lookupFieldByID)
+	ImportResource(ctx, request, response, &fieldResourceModel{}, r.lookupFieldByID)
 }
