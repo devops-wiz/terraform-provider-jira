@@ -5,6 +5,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
@@ -82,26 +83,12 @@ func (r *fieldResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			},
 			"field_type": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "The field type key (e.g., 'cascadingselect', 'textfield').",
+				MarkdownDescription: fmt.Sprintf("The field type key.\n\t- Valid values:\n\t\t- %s", strings.Join(fieldTypeKeys, "\n\t\t* ")),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
-					stringvalidator.OneOf(
-						"com.atlassian.jira.plugin.system.customfieldtypes:textfield",
-						"com.atlassian.jira.plugin.system.customfieldtypes:textarea",
-						"com.atlassian.jira.plugin.system.customfieldtypes:select",
-						"com.atlassian.jira.plugin.system.customfieldtypes:multiselect",
-						"com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons",
-						"com.atlassian.jira.plugin.system.customfieldtypes:datepicker",
-						"com.atlassian.jira.plugin.system.customfieldtypes:datetime",
-						"com.atlassian.jira.plugin.system.customfieldtypes:float",
-						"com.atlassian.jira.plugin.system.customfieldtypes:url",
-						"com.atlassian.jira.plugin.system.customfieldtypes:labels",
-						"com.atlassian.jira.plugin.system.customfieldtypes:userpicker",
-						"com.atlassian.jira.plugin.system.customfieldtypes:grouppicker",
-						"com.atlassian.jira.plugin.system.customfieldtypes:cascadingselect",
-					),
+					stringvalidator.OneOf(fieldTypeKeys...),
 				},
 			},
 		},
@@ -156,7 +143,7 @@ func (r *fieldResource) Read(ctx context.Context, req resource.ReadRequest, resp
 // and updatedResource (*models.CustomFieldScheme) containing the updated field data.
 // Returns: the updated field (*models.IssueFieldScheme), the API response (*models.ResponseScheme), and an error if any.
 func (r *fieldResource) updateField(ctx context.Context, id string, updatedResource *models.CustomFieldScheme) (*models.IssueFieldScheme, *models.ResponseScheme, error) {
-	// Jira does not allow changing field type on update; only mutable fields should be sent.
+	// Jira does not allow changing a field type on update; only mutable fields should be sent.
 	u := &models.CustomFieldScheme{
 		Name:        updatedResource.Name,
 		Description: updatedResource.Description,

@@ -36,7 +36,29 @@ Creating and deleting custom fields typically requires Jira Administration permi
 
 ### Required
 
-- `field_type` (String) The field type key (e.g., 'cascadingselect', 'textfield').
+- `field_type` (String) The field type key.
+	- Valid values:
+		- cascadingselect
+		* datepicker
+		* datetime
+		* float
+		* grouppicker
+		* importid
+		* labels
+		* multicheckboxes
+		* multigrouppicker
+		* multiselect
+		* multiuserpicker
+		* multiversion
+		* project
+		* radiobuttons
+		* readonlyfield
+		* select
+		* textarea
+		* textfield
+		* url
+		* userpicker
+		* version
 - `name` (String) The display name of the field.
 
 ### Optional
