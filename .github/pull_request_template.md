@@ -41,32 +41,15 @@ Example: feat(provider): add configurable HTTP timeouts
 - Breaking changes: Yes/No
 - Migration notes (if any):
 
-## RELEASE (Changelog)
-
-<!--
-Required for user-facing changes. This section is consumed by release tooling.
-If there are no user-facing changes, set the `skip-release-notes` label and leave this section empty.
-Categories follow Keep a Changelog: added | changed | deprecated | removed | fixed | security
--->
-
-- Category: added | changed | deprecated | removed | fixed | security
-- Release note (concise, user-facing):
-  -
-- Breaking change: Yes/No
-- Upgrade notes (if breaking):
-
 ## Checklist (prioritized)
 
 ### Critical before merge
 - [ ] Acceptance tests executed and passed: `task test:acc` (Task loads .env) — if applicable; docs/CI-only PRs may skip.
-- [ ] Changelog provided:
-  - [ ] RELEASE section above filled out for user-facing changes
-  - [ ] OR `skip-release-notes` label applied when there are no user-facing changes
 - [ ] Docs generated and committed:
   - [ ] `task gen` (runs `go generate ./...`) and/or `task docs` (tfplugindocs)
   - [ ] No remaining git diff under `docs/`
   - [ ] Examples changed: ran `task gen` (formats examples and validates/generates docs)
-- [ ] Appropriate labels applied (exactly one canonical category label `type:*` OR `skip-release-notes`; enforced by PR Label Guard)
+- [ ] (Optional) Add helpful labels (`bug`, `enhancement`, `documentation`,`github_actions`)
 - [ ] No secrets in logs/errors; sensitive values redacted
 
 ### Standard checks

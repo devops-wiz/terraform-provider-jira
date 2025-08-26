@@ -4,6 +4,8 @@ A Terraform provider for managing Jira resources using the [go-atlassian](https:
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/devops-wiz/terraform-provider-jira)](https://goreportcard.com/report/github.com/devops-wiz/terraform-provider-jira)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
+[![CodeQL](https://github.com/devops-wiz/terraform-provider-jira/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/devops-wiz/terraform-provider-jira/actions/workflows/github-code-scanning/codeql)
+[![Version and Release](https://github.com/devops-wiz/terraform-provider-jira/actions/workflows/release.yml/badge.svg)](https://github.com/devops-wiz/terraform-provider-jira/actions/workflows/release.yml)
 
 ## Requirements
 
