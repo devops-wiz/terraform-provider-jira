@@ -105,7 +105,7 @@ func (d *workTypesDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 						},
 						"hierarchy_level": schema.Int32Attribute{
 							Computed:            true,
-							MarkdownDescription: hierarchyDescription,
+							MarkdownDescription: HierarchyDescription,
 						},
 					},
 				},

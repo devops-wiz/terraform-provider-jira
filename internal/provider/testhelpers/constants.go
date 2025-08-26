@@ -5,11 +5,10 @@ package testhelpers
 
 import (
 	"path/filepath"
+	"runtime"
 )
 
 const (
-	// TmplPath defines the base path for template files.
-	TmplPath = "./testdata/templates"
 	// DataWorkTypesTmpl is the filename for the data.work_types Terraform template.
 	DataWorkTypesTmpl = "data.work_types.tf.tmpl"
 	// WorkTypeTmpl is the filename for the work_type Terraform template.
@@ -24,24 +23,29 @@ const (
 	FieldTmpl = "field.tf.tmpl"
 )
 
+// TemplatesDir defines the base directory for template files.
+const TemplatesDir = "templates"
+
+// tmplPath builds a full path to a template inside TemplatesDir.
+func tmplPath(name string) string {
+	_, currentFile, _, _ := runtime.Caller(0)
+
+	currentDir := filepath.Dir(currentFile)
+
+	return filepath.Join(currentDir, TemplatesDir, name)
+}
+
 var (
-	// DataWorkTypesTmplPath defines the file path for the data work types template based on the base template path.
-	DataWorkTypesTmplPath = filepath.Join(TmplPath, DataWorkTypesTmpl)
-	// WorkTypeTmplPath defines the file path for the work type template based on the base template path.
-	WorkTypeTmplPath = filepath.Join(TmplPath, WorkTypeTmpl)
+	DataWorkTypesTmplPath = tmplPath(DataWorkTypesTmpl)
+	WorkTypeTmplPath      = tmplPath(WorkTypeTmpl)
+	DataProjectTmplPath   = tmplPath(DataProjectTmpl)
+	ProjectTmplPath       = tmplPath(ProjectTmpl)
+	ProjectCatTmplPath    = tmplPath(ProjectCatTmpl)
+	FieldTmplPath         = tmplPath(FieldTmpl)
+)
 
-	// DataProjectTmplPath defines the file path for the data project template based on the base template path.
-	DataProjectTmplPath = filepath.Join(TmplPath, DataProjectTmpl)
-	// ProjectTmplPath defines the file path for the project template based on the base template path.
-	ProjectTmplPath = filepath.Join(TmplPath, ProjectTmpl)
-
-	// ProjectCatTmplPath defines the file path for the project category template based on the base template path.
-	ProjectCatTmplPath = filepath.Join(TmplPath, ProjectCatTmpl)
-	// FieldTmplPath defines the file path for the field template based on the base template path.
-	FieldTmplPath = filepath.Join(TmplPath, FieldTmpl)
-
-	// StandardWorkType represents the standard type of work, indicated with a value of 0.
+// Work type identifiers.
+const (
 	StandardWorkType = 0
-	// SubtaskWorkType represents a subtask type of work, indicated with a value of -1.
-	SubtaskWorkType = -1
+	SubtaskWorkType  = -1
 )

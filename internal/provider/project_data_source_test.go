@@ -33,7 +33,7 @@ func TestAccDataSourceProject_lookupByKeyAndID(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testhelpers.TestAccProjectWithDataSource(t, key, name, projectType, "key"),
+				Config: testhelpers.GetProjCfgWithDsTmpl(t, key, name, projectType, "key"),
 				ConfigStateChecks: []statecheck.StateCheck{
 					// resource exists
 					statecheck.ExpectKnownValue(rName, tfjsonpath.New("key"), knownvalue.StringExact(key)),
@@ -44,7 +44,7 @@ func TestAccDataSourceProject_lookupByKeyAndID(t *testing.T) {
 				},
 			},
 			{
-				Config: testhelpers.TestAccProjectWithDataSource(t, key, name, projectType, "id"),
+				Config: testhelpers.GetProjCfgWithDsTmpl(t, key, name, projectType, "id"),
 				ConfigStateChecks: []statecheck.StateCheck{
 					// data source by id should resolve and match the resource
 					statecheck.ExpectKnownValue(dsByID, tfjsonpath.New("project_key"), knownvalue.StringExact(key)),

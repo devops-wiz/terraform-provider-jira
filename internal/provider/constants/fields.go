@@ -1,31 +1,20 @@
 // SPDX-License-Identifier: MPL-2.0
 
-package provider
+package constants
 
 import (
 	"maps"
 	"slices"
 )
 
-const hierarchyDescription = `
-The level of the work type in the Jira issue type hierarchy:
-  - -1: Sub-task (child issue type)
-  - 0: Standard issue type (default level)
-  - 1: Epic (Epic level)
-Higher levels (2+) are available only in Jira Software Premium via Advanced Roadmaps custom hierarchy. Standard editions do not support setting levels above 0 (except -1 for sub-tasks).
-References:
-- Atlassian: Issue type hierarchy — https://support.atlassian.com/jira-software-cloud/docs/issue-type-hierarchy/
-- Atlassian: Configure issue type hierarchy (Advanced Roadmaps) — https://support.atlassian.com/jira-software-cloud/docs/configure-issue-type-hierarchy/
-`
-
-// FieldTypeSpec represents the type specification for a field with its associated value and searcher key.
+// FieldTypeSpec defines the structure for representing a field type with its unique value and associated searcher key.
 type FieldTypeSpec struct {
 	Value       string
 	SearcherKey string
 }
 
-// fieldTypesMap defines a mapping of custom field types to their corresponding specifications and searcher keys.
-var fieldTypesMap = map[string]FieldTypeSpec{
+// FieldTypesMap maps a short field type key to its corresponding FieldTypeSpec containing API value and searcher key.
+var FieldTypesMap = map[string]FieldTypeSpec{
 	"cascadingselect": {
 		Value:       "com.atlassian.jira.plugin.system.customfieldtypes:cascadingselect",
 		SearcherKey: "com.atlassian.jira.plugin.system.customfieldtypes:cascadingselectsearcher",
@@ -108,5 +97,5 @@ var fieldTypesMap = map[string]FieldTypeSpec{
 	},
 }
 
-// Get sorted field type keys for custom field type enumeration.
-var fieldTypeKeys = slices.Sorted(maps.Keys(fieldTypesMap))
+// FieldTypeKeys is a sorted slice of keys derived from the FieldTypesMap, representing valid field type identifiers.
+var FieldTypeKeys = slices.Sorted(maps.Keys(FieldTypesMap))
