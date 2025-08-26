@@ -114,28 +114,20 @@ tasks:
         {{- if .ACC_ONLY}} -run TestAcc*{{end -}}
 
 
-  test:*:
+  test:all:
+    desc: Shorthand for 'task test ACC=true' which runs all tests.
+    silent: true
+    cmd: task test ACC=true
 
-    vars:
-      TYPE: '{{index .MATCH 0 | lower}}'
 
-    requires:
-      vars:
-        - name: TYPE
-          enum: [unit, acc, all]
+  test:acc:
+    silent: true
+    aliases:
+      - acc
 
     desc: Shortcut command for `task test ACC_ONLY=true`
 
-    cmd: |
-      {{if eq .TYPE "unit" -}}
-        task test
-      {{- else if eq .TYPE "acc" -}}
-        task test ACC_ONLY=true
-      {{- else if eq .TYPE "all" -}}
-        task test ACC=true
-      {{- else -}}
-        echo 'Invalid option {{.TYPE}}'
-      {{- end}}
+    cmd: task test ACC_ONLY=true
 
 
   sweep:
