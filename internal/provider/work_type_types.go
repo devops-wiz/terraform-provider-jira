@@ -21,37 +21,6 @@ type workTypeResourceModel struct {
 	HierarchyLevel types.Int32  `tfsdk:"hierarchy_level"`
 }
 
-func (i *workTypeResourceModel) GetAPIPayload(_ context.Context) (createPayload *models.IssueTypePayloadScheme, diags diag.Diagnostics) {
-	return &models.IssueTypePayloadScheme{
-		Name:           i.Name.ValueString(),
-		Description:    i.Description.ValueString(),
-		HierarchyLevel: int(i.HierarchyLevel.ValueInt32()),
-	}, nil
-}
-
-func (i *workTypeResourceModel) GetID() string {
-	return i.ID.ValueString()
-}
-
-func (i *workTypeResourceModel) TransformToState(_ context.Context, issueType *models.IssueTypeScheme) diag.Diagnostics {
-	resourceModel := workTypeResourceModel{
-		ID:             types.StringValue(issueType.ID),
-		Name:           types.StringValue(issueType.Name),
-		IconURL:        types.StringValue(issueType.IconURL),
-		Subtask:        types.BoolValue(issueType.Subtask),
-		AvatarID:       types.Int64Value(int64(issueType.AvatarID)),
-		HierarchyLevel: types.Int32Value(int32(issueType.HierarchyLevel)),
-	}
-
-	if issueType.Description != "" {
-		resourceModel.Description = types.StringValue(issueType.Description)
-	}
-
-	*i = resourceModel
-
-	return nil
-}
-
 func (i *workTypeResourceModel) AttributeTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"id":              types.StringType,
@@ -62,4 +31,19 @@ func (i *workTypeResourceModel) AttributeTypes() map[string]attr.Type {
 		"avatar_id":       types.Int64Type,
 		"hierarchy_level": types.Int32Type,
 	}
+}
+
+// mapWorkTypeSchemeToModel centralizes mapping for resources/data sources and matches CRUDHooks MapToState signature.
+func mapWorkTypeSchemeToModel(_ context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+	*st = workTypeResourceModel{
+		ID:             types.StringValue(api.ID),
+		Name:           types.StringValue(api.Name),
+		IconURL:        types.StringValue(api.IconURL),
+		Subtask:        boolValue(api.Subtask),
+		AvatarID:       types.Int64Value(int64(api.AvatarID)),
+		HierarchyLevel: types.Int32Value(int32(api.HierarchyLevel)),
+		Description:    stringOrNull(api.Description),
+	}
+	return diags
 }

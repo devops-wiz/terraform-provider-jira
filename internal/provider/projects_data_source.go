@@ -24,7 +24,7 @@ var _ datasource.DataSourceWithConfigure = (*projectsDataSource)(nil)
 func NewProjectsDataSource() datasource.DataSource { return &projectsDataSource{} }
 
 type projectsDataSource struct {
-	baseJira
+	ServiceClient
 }
 
 type projectsDataSourceModel struct {
@@ -147,8 +147,6 @@ func (d *projectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 	}
 
 	// Fetch all projects via paginated API. Prefer server pagination where available.
-	var all []*models.ProjectScheme
-
 	opts := &models.ProjectSearchOptionsScheme{
 		IDs:      ids,
 		Keys:     keys,
@@ -161,44 +159,65 @@ func (d *projectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		opts.Query = data.Query.ValueString()
 	}
 
-	startAt := 0
-	maxResults := 50
-	for {
-		searchResults, apiResp, err := d.client.Project.Search(ctx, opts, startAt, maxResults)
-		if !EnsureSuccessOrDiagFromSchemeWithOptions(ctx, "list projects", apiResp, err, &resp.Diagnostics, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
-			return
+	allFetcher := func(ctx context.Context) ([]*models.ProjectScheme, diag.Diagnostics) {
+		var diags diag.Diagnostics
+		var all []*models.ProjectScheme
+		startAt := 0
+		maxResults := 50
+		for {
+			searchResults, apiResp, err := d.client.Project.Search(ctx, opts, startAt, maxResults)
+			if !EnsureSuccessOrDiagFromSchemeWithOptions(ctx, "list projects", apiResp, err, &resp.Diagnostics, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
+				return nil, diags
+			}
+			values := searchResults.Values
+			if len(values) == 0 {
+				break
+			}
+			all = append(all, values...)
+			if searchResults.IsLast {
+				break
+			}
+			// Advance by observed page size to avoid duplicates if server returns partial pages
+			startAt += len(values)
 		}
-
-		values := searchResults.Values
-		if len(values) == 0 {
-			break
-		}
-		all = append(all, values...)
-
-		if searchResults.IsLast {
-			break
-		}
-		// Advance by observed page size to avoid duplicates if server returns partial pages
-		startAt += len(values)
+		// Deterministic ordering: by project key, then by ID for stable state
+		sort.Slice(all, func(i, j int) bool {
+			if all[i].Key == all[j].Key {
+				return all[i].ID < all[j].ID
+			}
+			return all[i].Key < all[j].Key
+		})
+		return all, diags
 	}
 
-	// Deterministic ordering: by project key, then by ID for stable state
-	sort.Slice(all, func(i, j int) bool {
-		if all[i].Key == all[j].Key {
-			return all[i].ID < all[j].ID
-		}
-		return all[i].Key < all[j].Key
+	objMap, mapDiags := DoListToMap[*models.ProjectScheme, projectResourceModel](ctx, ListHooks[*models.ProjectScheme, projectResourceModel]{
+		List: allFetcher,
+		KeyOf: func(p *models.ProjectScheme) string {
+			return p.ID
+		},
+		MapToOut: func(ctx context.Context, p *models.ProjectScheme) (projectResourceModel, diag.Diagnostics) {
+			var diags diag.Diagnostics
+			var m projectResourceModel
+			diags.Append(mapProjectSchemeToModel(ctx, p, &m)...)
+			return m, diags
+		},
+		AttrTypes: func() map[string]attr.Type {
+			return map[string]attr.Type{
+				"id":               types.StringType,
+				"key":              types.StringType,
+				"name":             types.StringType,
+				"project_type_key": types.StringType,
+				"description":      types.StringType,
+				"url":              types.StringType,
+				"assignee_type":    types.StringType,
+				"lead_account_id":  types.StringType,
+				"category_id":      types.Int64Type,
+			}
+		},
 	})
-
-	// Map to state objects keyed by canonical ID
-	objMap := make(map[string]projectResourceModel, len(all))
-	for _, p := range all {
-		var m projectResourceModel
-		if diags := m.TransformToState(ctx, p); diags.HasError() {
-			resp.Diagnostics.Append(diags...)
-			return
-		}
-		objMap[m.ID.ValueString()] = m
+	if mapDiags.HasError() {
+		resp.Diagnostics.Append(mapDiags...)
+		return
 	}
 
 	var mDiag diag.Diagnostics

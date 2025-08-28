@@ -36,7 +36,7 @@ var emptyTypeModel = workTypeResourceModel{}
 const workTypesClientFilterThreshold = 100
 
 type workTypesDataSource struct {
-	baseJira
+	ServiceClient
 	typeService jira.TypeConnector
 }
 
@@ -164,29 +164,81 @@ func (d *workTypesDataSource) Read(ctx context.Context, req datasource.ReadReque
 		action += fmt.Sprintf(" (filter=names:%d)", len(names))
 	}
 
-	// Note: Jira's /issuetype list endpoint is not paginated and does not support server-side filtering by name.
-	// Prefer a single list call and client-side filtering for both IDs and names.
+	// Jira /issuetype is not paginated and lacks server-side filtering.
 	issueTypes, apiResp, err := d.typeService.Gets(ctx)
 	if !EnsureSuccessOrDiagFromSchemeWithOptions(ctx, action, apiResp, err, &resp.Diagnostics, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
 		return
 	}
 
-	// Build cached lookups (by ID and case-insensitive name)
-	byID := make(map[string]*models.IssueTypeScheme, len(issueTypes))
-	byNameCI := make(map[string]*models.IssueTypeScheme, len(issueTypes))
-	for _, it := range issueTypes {
-		byID[it.ID] = it
-		byNameCI[strings.ToLower(it.Name)] = it
+	// Client-side filtering threshold debug log to aid troubleshooting.
+	if (len(ids) > 0 || len(names) > 0) && len(issueTypes) >= workTypesClientFilterThreshold {
+		tflog.Debug(ctx, "Client-side filtering of work types due to Jira /issuetype limitations", map[string]interface{}{
+			"total_fetched":      len(issueTypes),
+			"ids_filter_count":   len(ids),
+			"names_filter_count": len(names),
+			"threshold":          workTypesClientFilterThreshold,
+		})
 	}
 
-	selected := make(map[string]*models.IssueTypeScheme)
+	// Build filters and track found for warning messages
+	idFilter := map[string]struct{}{}
+	for _, id := range uniqueStrings(ids) {
+		idFilter[id] = struct{}{}
+	}
+	nameFilter := map[string]struct{}{}
+	for _, n := range uniqueStrings(names) {
+		nameFilter[strings.ToLower(n)] = struct{}{}
+	}
+	foundIDs := map[string]struct{}{}
+	foundNames := map[string]struct{}{}
 
-	if len(ids) > 0 {
+	// Use List runner for mapping
+	list := func(ctx context.Context) ([]*models.IssueTypeScheme, diag.Diagnostics) {
+		var diags diag.Diagnostics
+		return issueTypes, diags
+	}
+
+	objMap, mapDiags := DoListToMap[*models.IssueTypeScheme, workTypeResourceModel](ctx, ListHooks[*models.IssueTypeScheme, workTypeResourceModel]{
+		List: list,
+		Filter: func(ctx context.Context, it *models.IssueTypeScheme) bool {
+			if len(idFilter) > 0 {
+				if _, ok := idFilter[it.ID]; ok {
+					foundIDs[it.ID] = struct{}{}
+					return true
+				}
+				return false
+			}
+			if len(nameFilter) > 0 {
+				ln := strings.ToLower(it.Name)
+				if _, ok := nameFilter[ln]; ok {
+					foundNames[ln] = struct{}{}
+					return true
+				}
+				return false
+			}
+			return true
+		},
+		KeyOf: func(it *models.IssueTypeScheme) string {
+			return it.ID
+		},
+		MapToOut: func(ctx context.Context, it *models.IssueTypeScheme) (workTypeResourceModel, diag.Diagnostics) {
+			var diags diag.Diagnostics
+			var m workTypeResourceModel
+			diags.Append(mapWorkTypeSchemeToModel(ctx, it, &m)...)
+			return m, diags
+		},
+		AttrTypes: emptyTypeModel.AttributeTypes,
+	})
+	if mapDiags.HasError() {
+		resp.Diagnostics.Append(mapDiags...)
+		return
+	}
+
+	// Missing warnings
+	if len(idFilter) > 0 {
 		var missing []string
-		for _, id := range uniqueStrings(ids) {
-			if it, ok := byID[id]; ok {
-				selected[it.ID] = it
-			} else {
+		for id := range idFilter {
+			if _, ok := foundIDs[id]; !ok {
 				missing = append(missing, id)
 			}
 		}
@@ -197,12 +249,11 @@ func (d *workTypesDataSource) Read(ctx context.Context, req datasource.ReadReque
 				fmt.Sprintf("The following IDs were not found in Jira: %v. They will be omitted from the result.", missing),
 			)
 		}
-	} else if len(names) > 0 {
+	}
+	if len(nameFilter) > 0 {
 		var missing []string
-		for _, n := range uniqueStrings(names) {
-			if it, ok := byNameCI[strings.ToLower(n)]; ok {
-				selected[it.ID] = it
-			} else {
+		for n := range nameFilter {
+			if _, ok := foundNames[n]; !ok {
 				missing = append(missing, n)
 			}
 		}
@@ -213,42 +264,15 @@ func (d *workTypesDataSource) Read(ctx context.Context, req datasource.ReadReque
 				fmt.Sprintf("The following names were not found in Jira: %v. They will be omitted from the result.", missing),
 			)
 		}
-	} else {
-		for _, it := range issueTypes {
-			selected[it.ID] = it
-		}
-	}
-
-	// Debug: if we are applying client-side filtering over a large set, emit a message to aid troubleshooting.
-	if (len(ids) > 0 || len(names) > 0) && len(issueTypes) >= workTypesClientFilterThreshold {
-		tflog.Debug(ctx, "Client-side filtering of work types due to Jira /issuetype limitations", map[string]interface{}{
-			"total_fetched":      len(issueTypes),
-			"ids_filter_count":   len(ids),
-			"names_filter_count": len(names),
-			"result_count":       len(selected),
-			"threshold":          workTypesClientFilterThreshold,
-		})
-	}
-
-	workTypeModels := make(map[string]workTypeResourceModel, len(selected))
-	for id, it := range selected {
-		workTypeModels[id] = workTypeResourceModel{
-			ID:             types.StringValue(it.ID),
-			Name:           types.StringValue(it.Name),
-			HierarchyLevel: types.Int32Value(int32(it.HierarchyLevel)),
-			Subtask:        types.BoolValue(it.Subtask),
-			AvatarID:       types.Int64Value(int64(it.AvatarID)),
-			IconURL:        types.StringValue(it.IconURL),
-		}
 	}
 
 	var mDiag diag.Diagnostics
-	data.WorkTypes, mDiag = types.MapValueFrom(ctx, types.ObjectType{AttrTypes: emptyTypeModel.AttributeTypes()}, workTypeModels)
+	data.WorkTypes, mDiag = types.MapValueFrom(ctx, types.ObjectType{AttrTypes: emptyTypeModel.AttributeTypes()}, objMap)
 	if mDiag.HasError() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("work_types"),
 			"Failed to build work_types",
-			fmt.Sprintf("Could not encode %d work types into state. This may indicate a schema mismatch or unexpected nulls. See underlying diagnostics for details.", len(workTypeModels)),
+			fmt.Sprintf("Could not encode %d work types into state. This may indicate a schema mismatch or unexpected nulls. See underlying diagnostics for details.", len(objMap)),
 		)
 		resp.Diagnostics.Append(mDiag...)
 		return
