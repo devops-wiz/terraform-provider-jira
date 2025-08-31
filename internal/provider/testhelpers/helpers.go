@@ -223,3 +223,14 @@ func TestAccProjectCategoryConfig(t *testing.T, name, desc string) string {
 
 	return projectCatTf.String()
 }
+
+// RandString provides a simple deterministic-ish suffix for names when acctest isn't required.
+// We prefer acctest.RandomWithPrefix elsewhere; here we keep it self-contained.
+func RandString(n int) string {
+	letters := []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[i%len(letters)]
+	}
+	return string(s)
+}
