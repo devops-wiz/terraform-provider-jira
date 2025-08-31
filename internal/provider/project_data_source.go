@@ -5,6 +5,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -19,7 +20,7 @@ var _ datasource.DataSourceWithConfigure = (*projectDataSource)(nil)
 func NewProjectDataSource() datasource.DataSource { return &projectDataSource{} }
 
 type projectDataSource struct {
-	baseJira
+	ServiceClient
 }
 
 type projectDataSourceModel struct {
@@ -160,23 +161,44 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	// Map API model to state using existing resource mapping for consistency.
-	var m projectResourceModel
-	if diags := m.TransformToState(ctx, proj); diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
+	// Map API model to data source outputs inline
+	data.ID = types.StringValue(proj.ID)
+	data.KeyOut = types.StringValue(proj.Key)
+	data.Name = types.StringValue(proj.Name)
+	data.ProjectTypeKey = types.StringValue(proj.ProjectTypeKey)
+
+	if proj.Description != "" {
+		data.Description = types.StringValue(proj.Description)
+	} else {
+		data.Description = types.StringNull()
+	}
+	if proj.URL != "" {
+		data.URL = types.StringValue(proj.URL)
+	} else {
+		data.URL = types.StringNull()
+	}
+	if proj.AssigneeType != "" {
+		data.AssigneeType = types.StringValue(proj.AssigneeType)
+	} else {
+		data.AssigneeType = types.StringNull()
+	}
+	if proj.Lead != nil && proj.Lead.AccountID != "" {
+		data.LeadAccountID = types.StringValue(proj.Lead.AccountID)
+	} else {
+		data.LeadAccountID = types.StringNull()
 	}
 
-	// Assign to data source output fields (prefixed versions of id/key to avoid overlap with inputs)
-	data.ID = m.ID
-	data.KeyOut = m.Key
-	data.Name = m.Name
-	data.ProjectTypeKey = m.ProjectTypeKey
-	data.Description = m.Description
-	data.URL = m.URL
-	data.AssigneeType = m.AssigneeType
-	data.LeadAccountID = m.LeadAccountID
-	data.CategoryID = m.CategoryID
+	var catID int64
+	if proj.Category != nil && proj.Category.ID != "" {
+		if v, err := strconv.ParseInt(proj.Category.ID, 10, 64); err == nil {
+			catID = v
+		}
+	}
+	if catID != 0 {
+		data.CategoryID = types.Int64Value(catID)
+	} else {
+		data.CategoryID = types.Int64Null()
+	}
 
 	if diags := resp.State.Set(ctx, &data); diags.HasError() {
 		resp.Diagnostics.AddError(

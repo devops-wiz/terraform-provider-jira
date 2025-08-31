@@ -6,7 +6,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/ctreminiom/go-atlassian/v2/service/jira"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -26,7 +28,7 @@ func NewWorkTypeResource() resource.Resource {
 }
 
 type workTypeResource struct {
-	baseJira
+	ServiceClient
 	typeService jira.TypeConnector
 }
 
@@ -124,29 +126,135 @@ func (r *workTypeResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 func (r *workTypeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Create)
 	defer cancel()
-	CreateResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Create)
+
+	runner := NewCRUDRunner(r.hooks())
+	diags := runner.DoCreate(
+		ctx,
+		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(req.Plan.Get(ctx, dst)...)
+			return d
+		},
+		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(resp.State.Set(ctx, src)...)
+			return d
+		},
+		ensureWith(&resp.Diagnostics),
+	)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r *workTypeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
-	ReadResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Get)
+
+	runner := NewCRUDRunner(r.hooks())
+	diags := runner.DoRead(
+		ctx,
+		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(req.State.Get(ctx, dst)...)
+			return d
+		},
+		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(resp.State.Set(ctx, src)...)
+			return d
+		},
+		func(ctx context.Context) { resp.State.RemoveResource(ctx) },
+		ensureWith(&resp.Diagnostics),
+		HTTPStatusFromScheme,
+	)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r *workTypeResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Update)
 	defer cancel()
-	UpdateResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Update)
+
+	runner := NewCRUDRunner(r.hooks())
+	diags := runner.DoUpdate(
+		ctx,
+		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(req.Plan.Get(ctx, dst)...)
+			return d
+		},
+		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(resp.State.Set(ctx, src)...)
+			return d
+		},
+		ensureWith(&resp.Diagnostics),
+	)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r *workTypeResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Delete)
 	defer cancel()
-	DeleteResource(ctx, req, resp, &workTypeResourceModel{}, r.typeService.Delete)
+
+	runner := NewCRUDRunner(r.hooks())
+	diags := runner.DoDelete(
+		ctx,
+		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(req.State.Get(ctx, dst)...)
+			return d
+		},
+		ensureWith(&resp.Diagnostics),
+	)
+	resp.Diagnostics.Append(diags...)
 }
 
 func (r *workTypeResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
-	ImportResource(ctx, request, response, &workTypeResourceModel{}, r.typeService.Get)
+
+	diags := DoImport[workTypeResourceModel, *models.IssueTypeScheme](
+		ctx,
+		request.ID,
+		r.typeService.Get,
+		func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) diag.Diagnostics {
+			return r.hooks().MapToState(ctx, api, st)
+		},
+		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
+			var d diag.Diagnostics
+			d.Append(response.State.Set(ctx, src)...)
+			return d
+		},
+		ensureWith(&response.Diagnostics),
+	)
+	response.Diagnostics.Append(diags...)
+}
+
+// hooks returns the CRUD hooks for the generic runner.
+func (r *workTypeResource) hooks() CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme] {
+	return CRUDHooks[workTypeResourceModel, models.IssueTypePayloadScheme, *models.IssueTypeScheme]{
+		BuildPayload: func(ctx context.Context, st *workTypeResourceModel) (*models.IssueTypePayloadScheme, diag.Diagnostics) {
+			var diags diag.Diagnostics
+			p := &models.IssueTypePayloadScheme{
+				Name:           st.Name.ValueString(),
+				Description:    st.Description.ValueString(),
+				HierarchyLevel: int(st.HierarchyLevel.ValueInt32()),
+			}
+			return p, diags
+		},
+		APICreate: func(ctx context.Context, p *models.IssueTypePayloadScheme) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
+			return r.typeService.Create(ctx, p)
+		},
+		APIRead: func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
+			return r.typeService.Get(ctx, id)
+		},
+		APIUpdate: func(ctx context.Context, id string, p *models.IssueTypePayloadScheme) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
+			return r.typeService.Update(ctx, id, p)
+		},
+		APIDelete: func(ctx context.Context, id string) (*models.ResponseScheme, error) {
+			return r.typeService.Delete(ctx, id)
+		},
+		ExtractID:               func(st *workTypeResourceModel) string { return st.ID.ValueString() },
+		MapToState:              mapWorkTypeSchemeToModel,
+		TreatDelete404AsSuccess: true,
+	}
 }

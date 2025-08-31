@@ -229,11 +229,16 @@ func EnsureSuccessOrDiagFromScheme(ctx context.Context, op string, rs *models.Re
 func EnsureSuccessOrDiagFromSchemeWithOptions(ctx context.Context, op string, rs *models.ResponseScheme, err error, diags *diag.Diagnostics, opts *EnsureSuccessOrDiagOptions) bool {
 	status, _ := HTTPStatusStrictFromScheme(rs)
 	if err == nil {
-		if IsSuccess(status) {
-			return true
-		}
-		if opts != nil && containsInt(opts.AcceptableStatuses, status) {
-			return true
+		// If AcceptableStatuses provided, treat them as the exact allowed statuses.
+		if opts != nil && len(opts.AcceptableStatuses) > 0 {
+			if containsInt(opts.AcceptableStatuses, status) {
+				return true
+			}
+		} else {
+			// Default: any 2xx is success.
+			if IsSuccess(status) {
+				return true
+			}
 		}
 		if status == http.StatusNotFound && opts != nil && (opts.TreatRead404AsNotFound || opts.TreatDelete404AsSuccess) {
 			return true

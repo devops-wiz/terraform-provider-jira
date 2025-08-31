@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/devops-wiz/terraform-provider-jira/internal/provider/testhelpers"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -48,7 +49,7 @@ resource "jira_work_type" "test" {
   name            = "tf-acc-work-type-neg-import-%s"
   description     = "placeholder"
 }
-`, RandString(6))
+`, testhelpers.RandString(6))
 
 		resource.Test(t, resource.TestCase{
 			PreCheck:                 func() { testAccPreCheck(t) },
