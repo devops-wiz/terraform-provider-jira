@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/ctreminiom/go-atlassian/v2/service/jira"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -27,7 +28,7 @@ var _ datasource.DataSourceWithConfigure = (*projectCategoriesDataSource)(nil)
 func NewProjectCategoriesDataSource() datasource.DataSource { return &projectCategoriesDataSource{} }
 
 type projectCategoriesDataSource struct {
-	baseJira
+	ServiceClient
 	categoryService jira.ProjectCategoryConnector
 }
 
@@ -131,7 +132,8 @@ func (d *projectCategoriesDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
-	// Deterministic order for any intermediate processing: by name (case-insensitive), then by id
+	// Deterministic order: by name (case-insensitive), then by id
+	// Even though the final output is a map, we sort here for deterministic processing and stable debug logs.
 	sort.SliceStable(cats, func(i, j int) bool {
 		a := strings.ToLower(cats[i].Name)
 		b := strings.ToLower(cats[j].Name)
@@ -141,35 +143,98 @@ func (d *projectCategoriesDataSource) Read(ctx context.Context, req datasource.R
 		return a < b
 	})
 
-	// Build map keyed by ID, applying optional filters
-	result := make(map[string]projectCategoryResourceModel)
+	// Build filters and track found for warnings
 	idFilter := map[string]struct{}{}
-	for _, id := range ids {
+	for _, id := range uniqueStrings(ids) {
 		idFilter[id] = struct{}{}
 	}
 	nameFilter := map[string]struct{}{}
-	for _, n := range names {
+	for _, n := range uniqueStrings(names) {
 		nameFilter[strings.ToLower(n)] = struct{}{}
 	}
+	foundIDs := map[string]struct{}{}
+	foundNames := map[string]struct{}{}
 
-	for _, c := range cats {
-		if len(idFilter) > 0 {
-			if _, ok := idFilter[c.ID]; !ok {
-				continue
+	list := func(ctx context.Context) ([]*models.ProjectCategoryScheme, diag.Diagnostics) {
+		var diags diag.Diagnostics
+		// Transform [] to []* for generic signature
+		out := make([]*models.ProjectCategoryScheme, 0, len(cats))
+		out = append(out, cats...)
+		return out, diags
+	}
+
+	objMap, mapDiags := DoListToMap[*models.ProjectCategoryScheme, projectCategoryResourceModel](ctx, ListHooks[*models.ProjectCategoryScheme, projectCategoryResourceModel]{
+		List: list,
+		Filter: func(ctx context.Context, c *models.ProjectCategoryScheme) bool {
+			if len(idFilter) > 0 {
+				if _, ok := idFilter[c.ID]; ok {
+					foundIDs[c.ID] = struct{}{}
+					return true
+				}
+				return false
+			}
+			if len(nameFilter) > 0 {
+				ln := strings.ToLower(c.Name)
+				if _, ok := nameFilter[ln]; ok {
+					foundNames[ln] = struct{}{}
+					return true
+				}
+				return false
+			}
+			return true
+		},
+		KeyOf: func(c *models.ProjectCategoryScheme) string {
+			return c.ID
+		},
+		MapToOut: func(ctx context.Context, c *models.ProjectCategoryScheme) (projectCategoryResourceModel, diag.Diagnostics) {
+			var diags diag.Diagnostics
+			var m projectCategoryResourceModel
+			diags.Append(mapProjectCategorySchemeToModel(ctx, c, &m)...)
+			return m, diags
+		},
+		AttrTypes: func() map[string]attr.Type {
+			return map[string]attr.Type{
+				"id":          types.StringType,
+				"name":        types.StringType,
+				"description": types.StringType,
+			}
+		},
+	})
+	if mapDiags.HasError() {
+		resp.Diagnostics.Append(mapDiags...)
+		return
+	}
+
+	// Missing warnings
+	if len(idFilter) > 0 {
+		var missing []string
+		for id := range idFilter {
+			if _, ok := foundIDs[id]; !ok {
+				missing = append(missing, id)
 			}
 		}
-		if len(nameFilter) > 0 {
-			if _, ok := nameFilter[strings.ToLower(c.Name)]; !ok {
-				continue
+		if len(missing) > 0 {
+			sort.Strings(missing)
+			resp.Diagnostics.AddWarning(
+				"Some requested project category IDs were not found",
+				fmt.Sprintf("The following IDs were not found in Jira: %v. They will be omitted from the result.", missing),
+			)
+		}
+	}
+	if len(nameFilter) > 0 {
+		var missing []string
+		for n := range nameFilter {
+			if _, ok := foundNames[n]; !ok {
+				missing = append(missing, n)
 			}
 		}
-		m := projectCategoryResourceModel{}
-		// Reuse resource transformer for consistent mapping
-		if diags := m.TransformToState(ctx, c); diags.HasError() {
-			resp.Diagnostics.Append(diags...)
-			return
+		if len(missing) > 0 {
+			sort.Strings(missing)
+			resp.Diagnostics.AddWarning(
+				"Some requested project category names were not found",
+				fmt.Sprintf("The following names were not found in Jira: %v. They will be omitted from the result.", missing),
+			)
 		}
-		result[m.ID.ValueString()] = m
 	}
 
 	var diags diag.Diagnostics
@@ -177,12 +242,12 @@ func (d *projectCategoriesDataSource) Read(ctx context.Context, req datasource.R
 		"id":          types.StringType,
 		"name":        types.StringType,
 		"description": types.StringType,
-	}}, result)
+	}}, objMap)
 	if diags.HasError() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("categories"),
 			"Failed to build categories map",
-			fmt.Sprintf("Could not encode %d categories into state. See diagnostics for details.", len(result)),
+			fmt.Sprintf("Could not encode %d categories into state. See diagnostics for details.", len(objMap)),
 		)
 		resp.Diagnostics.Append(diags...)
 		return

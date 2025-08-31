@@ -11,33 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// projectCategoryResourceModel models the Terraform schema/state for jira_project_category
-// and implements the ResourceTransformer contract for generic CRUD helpers.
+// projectCategoryResourceModel models the Terraform schema/state for jira_project_category.
 type projectCategoryResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
-}
-
-func (m *projectCategoryResourceModel) GetAPIPayload(_ context.Context) (createPayload *models.ProjectCategoryPayloadScheme, diags diag.Diagnostics) {
-	return &models.ProjectCategoryPayloadScheme{
-		Name:        m.Name.ValueString(),
-		Description: m.Description.ValueString(),
-	}, nil
-}
-
-func (m *projectCategoryResourceModel) GetID() string { return m.ID.ValueString() }
-
-func (m *projectCategoryResourceModel) TransformToState(_ context.Context, cat *models.ProjectCategoryScheme) diag.Diagnostics {
-	state := projectCategoryResourceModel{
-		ID:   types.StringValue(cat.ID),
-		Name: types.StringValue(cat.Name),
-	}
-	if cat.Description != "" {
-		state.Description = types.StringValue(cat.Description)
-	}
-	*m = state
-	return nil
 }
 
 func (m *projectCategoryResourceModel) AttributeTypes() map[string]attr.Type {
@@ -46,4 +24,15 @@ func (m *projectCategoryResourceModel) AttributeTypes() map[string]attr.Type {
 		"name":        types.StringType,
 		"description": types.StringType,
 	}
+}
+
+// mapProjectCategorySchemeToModel centralizes mapping for resources/data sources and matches CRUDHooks MapToState signature.
+func mapProjectCategorySchemeToModel(_ context.Context, api *models.ProjectCategoryScheme, st *projectCategoryResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+	*st = projectCategoryResourceModel{
+		ID:          types.StringValue(api.ID),
+		Name:        types.StringValue(api.Name),
+		Description: stringOrNull(api.Description),
+	}
+	return diags
 }

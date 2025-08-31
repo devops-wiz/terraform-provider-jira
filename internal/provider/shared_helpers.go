@@ -7,11 +7,41 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
+
+// Tiny mapping helpers to reduce verbosity in map-to-state code.
+func stringOrNull(s string) types.String {
+	if s != "" {
+		return types.StringValue(s)
+	}
+	return types.StringNull()
+}
+
+func urlOrNull(s string) types.String { // alias for clarity in models with URLs
+	return stringOrNull(s)
+}
+
+func int64OrNull(v int64) types.Int64 {
+	if v != 0 {
+		return types.Int64Value(v)
+	}
+	return types.Int64Null()
+}
+
+func boolValue(b bool) types.Bool { return types.BoolValue(b) }
+
+// ensureWith wraps EnsureSuccessOrDiagFromSchemeWithOptions binding the diagnostics pointer.
+// Use in Resource CRUD/Import methods to avoid repeating the closure at each callsite.
+func ensureWith(diags *diag.Diagnostics) func(ctx context.Context, action string, resp *models.ResponseScheme, err error, opts *EnsureSuccessOrDiagOptions) bool {
+	return func(ctx context.Context, action string, resp *models.ResponseScheme, err error, opts *EnsureSuccessOrDiagOptions) bool {
+		return EnsureSuccessOrDiagFromSchemeWithOptions(ctx, action, resp, err, diags, opts)
+	}
+}
 
 // withTimeout wraps ctx with a timeout when d > 0. If d <= 0, it returns the
 // original context and a no-op cancel, allowing callers to `defer cancel()` unconditionally.
