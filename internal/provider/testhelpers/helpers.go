@@ -119,11 +119,11 @@ func MkRS(code int, headers http.Header, body string) *models.ResponseScheme {
 	return rs
 }
 
-// TestAccProjectWithDataSource generates a Terraform configuration string for creating a Jira project and data sources.
+// GetProjCfgWithDsTmpl generates a Terraform configuration string for creating a Jira project and data sources.
 // This function requires project attributes such as key, name, project type, and lookup type.
 // It uses a template file to build the configuration and executes it with provided parameters.
 // The returned string can be used in acceptance tests to verify resource and data source integration.
-func TestAccProjectWithDataSource(t *testing.T, key, name, projectType, lookupType string) string {
+func GetProjCfgWithDsTmpl(t *testing.T, key, name, projectType, lookupType string) string {
 	t.Helper()
 
 	projectResTmpl, err := template.New(ProjectTmpl).ParseFiles(ProjectTmplPath)
@@ -138,7 +138,7 @@ func TestAccProjectWithDataSource(t *testing.T, key, name, projectType, lookupTy
 		Key:           key,
 		Name:          name,
 		ProjectType:   projectType,
-		LeadAccountID: TestAccLeadAccountID(),
+		LeadAccountID: GetTestProjLeadAcctIdFromEnv(),
 	}
 
 	if err = projectResTmpl.Execute(&projTF, projectTmplCfg); err != nil {
@@ -168,11 +168,11 @@ func TestAccProjectWithDataSource(t *testing.T, key, name, projectType, lookupTy
 	return dataTf.String()
 }
 
-func TestAccLeadAccountID() string {
+func GetTestProjLeadAcctIdFromEnv() string {
 	return strings.TrimSpace(os.Getenv("JIRA_PROJECT_TEST_ROLE_LEAD_ID"))
 }
 
-func TestAccProjectResourceConfig(t *testing.T, key, name, projectType, leadAccountID, description string) string {
+func GetProjCfgStr(t *testing.T, key, name, projectType, leadAccountID, description string) string {
 	t.Helper()
 
 	tmpl, err := template.New(ProjectTmpl).ParseFiles(ProjectTmplPath)
@@ -200,7 +200,7 @@ func TestAccProjectResourceConfig(t *testing.T, key, name, projectType, leadAcco
 	return projectTf.String()
 }
 
-func TestAccProjectCategoryConfig(t *testing.T, name, desc string) string {
+func GetProjCatCfg(t *testing.T, name, desc string) string {
 	t.Helper()
 	tmpl, err := template.New(ProjectCatTmpl).ParseFiles(ProjectCatTmplPath)
 
@@ -222,6 +222,20 @@ func TestAccProjectCategoryConfig(t *testing.T, name, desc string) string {
 	}
 
 	return projectCatTf.String()
+}
+
+// GetFieldResCfg generates a Terraform field resource configuration using the provided template data.
+func GetFieldResCfg(t *testing.T, data FieldTemplateData) string {
+	t.Helper()
+	tmpl, err := template.New(FieldTmpl).ParseFiles(FieldTmplPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
 }
 
 // RandString provides a simple deterministic-ish suffix for names when acctest isn't required.

@@ -28,6 +28,7 @@ func NewProjectCategoryResource() resource.Resource { return &projectCategoryRes
 type projectCategoryResource struct {
 	ServiceClient
 	categoryService jira.ProjectCategoryConnector
+	crudRunner      CRUDRunner[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]
 }
 
 func (r *projectCategoryResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -50,6 +51,7 @@ func (r *projectCategoryResource) Configure(_ context.Context, req resource.Conf
 
 	r.client = provider.client
 	r.categoryService = provider.client.Project.Category
+	r.crudRunner = NewCRUDRunner(r.hooks())
 	r.providerTimeouts = provider.providerTimeouts
 }
 
@@ -121,18 +123,13 @@ func (r *projectCategoryResource) Create(ctx context.Context, req resource.Creat
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Create)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoCreate(
+	diags := r.crudRunner.DoCreate(
 		ctx,
 		func(ctx context.Context, dst *projectCategoryResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.Plan.Get(ctx, dst)...)
-			return d
+			return req.Plan.Get(ctx, dst)
 		},
 		func(ctx context.Context, src *projectCategoryResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		ensureWith(&resp.Diagnostics),
 	)
@@ -143,8 +140,7 @@ func (r *projectCategoryResource) Read(ctx context.Context, req resource.ReadReq
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoRead(
+	diags := r.crudRunner.DoRead(
 		ctx,
 		func(ctx context.Context, dst *projectCategoryResourceModel) diag.Diagnostics {
 			var d diag.Diagnostics
@@ -152,9 +148,7 @@ func (r *projectCategoryResource) Read(ctx context.Context, req resource.ReadReq
 			return d
 		},
 		func(ctx context.Context, src *projectCategoryResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		func(ctx context.Context) { resp.State.RemoveResource(ctx) },
 		ensureWith(&resp.Diagnostics),
@@ -167,18 +161,13 @@ func (r *projectCategoryResource) Update(ctx context.Context, req resource.Updat
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Update)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoUpdate(
+	diags := r.crudRunner.DoUpdate(
 		ctx,
 		func(ctx context.Context, dst *projectCategoryResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.Plan.Get(ctx, dst)...)
-			return d
+			return req.Plan.Get(ctx, dst)
 		},
 		func(ctx context.Context, src *projectCategoryResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		ensureWith(&resp.Diagnostics),
 	)
@@ -189,8 +178,7 @@ func (r *projectCategoryResource) Delete(ctx context.Context, req resource.Delet
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Delete)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoDelete(
+	diags := r.crudRunner.DoDelete(
 		ctx,
 		func(ctx context.Context, dst *projectCategoryResourceModel) diag.Diagnostics {
 			var d diag.Diagnostics
@@ -206,17 +194,11 @@ func (r *projectCategoryResource) ImportState(ctx context.Context, request resou
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	diags := DoImport[projectCategoryResourceModel, *models.ProjectCategoryScheme](
+	diags := r.crudRunner.DoImport(
 		ctx,
 		request.ID,
-		r.getCategory,
-		func(ctx context.Context, api *models.ProjectCategoryScheme, st *projectCategoryResourceModel) diag.Diagnostics {
-			return r.hooks().MapToState(ctx, api, st)
-		},
-		func(ctx context.Context, src *projectCategoryResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(response.State.Set(ctx, src)...)
-			return d
+		func(ctx context.Context, dst *projectCategoryResourceModel) diag.Diagnostics {
+			return response.State.Set(ctx, dst)
 		},
 		ensureWith(&response.Diagnostics),
 	)
@@ -224,8 +206,8 @@ func (r *projectCategoryResource) ImportState(ctx context.Context, request resou
 }
 
 // hooks returns the CRUD hooks for the generic runner.
-func (r *projectCategoryResource) hooks() CRUDHooks[projectCategoryResourceModel, models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme] {
-	return CRUDHooks[projectCategoryResourceModel, models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]{
+func (r *projectCategoryResource) hooks() CRUDHooks[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme] {
+	return CRUDHooks[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]{
 		BuildPayload: func(ctx context.Context, st *projectCategoryResourceModel) (*models.ProjectCategoryPayloadScheme, diag.Diagnostics) {
 			var diags diag.Diagnostics
 			p := &models.ProjectCategoryPayloadScheme{

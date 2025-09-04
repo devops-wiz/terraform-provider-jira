@@ -63,7 +63,7 @@ resource "jira_project" "p" {
 data "jira_projects" "test" {
   keys = [jira_project.p.key]
 }
-`, key, name, projectType, testhelpers.TestAccLeadAccountID())
+`, key, name, projectType, testhelpers.GetTestProjLeadAcctIdFromEnv())
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -100,7 +100,7 @@ resource "jira_project" "p" {
 data "jira_projects" "test" {
   ids = [jira_project.p.id]
 }
-`, key, name, projectType, testhelpers.TestAccLeadAccountID())
+`, key, name, projectType, testhelpers.GetTestProjLeadAcctIdFromEnv())
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
