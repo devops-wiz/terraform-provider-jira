@@ -18,13 +18,6 @@ var (
 	_ CRUDRunner[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]
 )
 
-// DoImport instantiations (state, api)
-var (
-	_ = DoImport[workTypeResourceModel, *models.IssueTypeScheme]
-	_ = DoImport[projectResourceModel, *models.ProjectScheme]
-	_ = DoImport[projectCategoryResourceModel, *models.ProjectCategoryScheme]
-)
-
 // ListHooks instantiations (api list item, out model)
 var (
 	_ ListHooks[*models.IssueTypeScheme, workTypeResourceModel]

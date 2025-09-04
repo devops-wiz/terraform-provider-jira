@@ -30,6 +30,7 @@ func NewWorkTypeResource() resource.Resource {
 type workTypeResource struct {
 	ServiceClient
 	typeService jira.TypeConnector
+	crudRunner  CRUDRunner[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]
 }
 
 func (r *workTypeResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -127,18 +128,13 @@ func (r *workTypeResource) Create(ctx context.Context, req resource.CreateReques
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Create)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoCreate(
+	diags := r.crudRunner.DoCreate(
 		ctx,
 		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.Plan.Get(ctx, dst)...)
-			return d
+			return req.Plan.Get(ctx, dst)
 		},
 		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		ensureWith(&resp.Diagnostics),
 	)
@@ -149,18 +145,13 @@ func (r *workTypeResource) Read(ctx context.Context, req resource.ReadRequest, r
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoRead(
+	diags := r.crudRunner.DoRead(
 		ctx,
 		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.State.Get(ctx, dst)...)
-			return d
+			return req.State.Get(ctx, dst)
 		},
 		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		func(ctx context.Context) { resp.State.RemoveResource(ctx) },
 		ensureWith(&resp.Diagnostics),
@@ -173,18 +164,13 @@ func (r *workTypeResource) Update(ctx context.Context, req resource.UpdateReques
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Update)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoUpdate(
+	diags := r.crudRunner.DoUpdate(
 		ctx,
 		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.Plan.Get(ctx, dst)...)
-			return d
+			return req.Plan.Get(ctx, dst)
 		},
 		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		ensureWith(&resp.Diagnostics),
 	)
@@ -195,13 +181,10 @@ func (r *workTypeResource) Delete(ctx context.Context, req resource.DeleteReques
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Delete)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoDelete(
+	diags := r.crudRunner.DoDelete(
 		ctx,
 		func(ctx context.Context, dst *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.State.Get(ctx, dst)...)
-			return d
+			return req.State.Get(ctx, dst)
 		},
 		ensureWith(&resp.Diagnostics),
 	)
@@ -212,17 +195,11 @@ func (r *workTypeResource) ImportState(ctx context.Context, request resource.Imp
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	diags := DoImport[workTypeResourceModel, *models.IssueTypeScheme](
+	diags := r.crudRunner.DoImport(
 		ctx,
 		request.ID,
-		r.typeService.Get,
-		func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) diag.Diagnostics {
-			return r.hooks().MapToState(ctx, api, st)
-		},
 		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(response.State.Set(ctx, src)...)
-			return d
+			return response.State.Set(ctx, src)
 		},
 		ensureWith(&response.Diagnostics),
 	)

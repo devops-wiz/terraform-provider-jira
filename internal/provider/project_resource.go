@@ -27,6 +27,7 @@ func NewProjectResource() resource.Resource { return &projectResource{} }
 
 type projectResource struct {
 	ServiceClient
+	crudRunner CRUDRunner[projectResourceModel, *models.ProjectPayloadScheme, *models.ProjectScheme]
 }
 
 func (r *projectResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -48,6 +49,7 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 	}
 
 	r.client = provider.client
+	r.crudRunner = NewCRUDRunner(r.hooks())
 	r.providerTimeouts = provider.providerTimeouts
 }
 
@@ -159,18 +161,13 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Create)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoCreate(
+	diags := r.crudRunner.DoCreate(
 		ctx,
 		func(ctx context.Context, dst *projectResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.Plan.Get(ctx, dst)...)
-			return d
+			return req.Plan.Get(ctx, dst)
 		},
 		func(ctx context.Context, src *projectResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		ensureWith(&resp.Diagnostics),
 	)
@@ -181,8 +178,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoRead(
+	diags := r.crudRunner.DoRead(
 		ctx,
 		func(ctx context.Context, dst *projectResourceModel) diag.Diagnostics {
 			var d diag.Diagnostics
@@ -190,9 +186,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 			return d
 		},
 		func(ctx context.Context, src *projectResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		func(ctx context.Context) { resp.State.RemoveResource(ctx) },
 		ensureWith(&resp.Diagnostics),
@@ -230,18 +224,13 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Update)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoUpdate(
+	diags := r.crudRunner.DoUpdate(
 		ctx,
 		func(ctx context.Context, dst *projectResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(req.Plan.Get(ctx, dst)...)
-			return d
+			return req.Plan.Get(ctx, dst)
 		},
 		func(ctx context.Context, src *projectResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(resp.State.Set(ctx, src)...)
-			return d
+			return resp.State.Set(ctx, src)
 		},
 		ensureWith(&resp.Diagnostics),
 	)
@@ -252,8 +241,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Delete)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoDelete(
+	diags := r.crudRunner.DoDelete(
 		ctx,
 		func(ctx context.Context, dst *projectResourceModel) diag.Diagnostics {
 			var d diag.Diagnostics
@@ -269,18 +257,11 @@ func (r *projectResource) ImportState(ctx context.Context, request resource.Impo
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	diags := DoImport[projectResourceModel, *models.ProjectScheme](
+	diags := r.crudRunner.DoImport(
 		ctx,
 		request.ID,
-		r.getProject,
-		func(ctx context.Context, api *models.ProjectScheme, st *projectResourceModel) diag.Diagnostics {
-			// Reuse the same mapper as the CRUD hooks
-			return r.hooks().MapToState(ctx, api, st)
-		},
 		func(ctx context.Context, src *projectResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.Append(response.State.Set(ctx, src)...)
-			return d
+			return response.State.Set(ctx, src)
 		},
 		ensureWith(&response.Diagnostics),
 	)

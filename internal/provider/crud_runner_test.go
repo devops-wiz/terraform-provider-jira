@@ -266,7 +266,7 @@ func TestCRUDRunner_PostCreateRead_CalledAndMapped(t *testing.T) {
 			st.ID = types.StringValue(api.ID)
 			return nil
 		},
-		PostCreateRead: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
+		PostCreate: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			postReadCalled = true
 			return &models.IssueTypeScheme{ID: "post"}, testhelpers.MkRS(200, nil, ""), nil
 		},
@@ -288,7 +288,7 @@ func TestCRUDRunner_PostCreateRead_CalledAndMapped(t *testing.T) {
 		t.Fatalf("unexpected diagnostics on post-create-read: %v %v", cd, diags)
 	}
 	if !postReadCalled {
-		t.Fatalf("expected PostCreateRead to be called")
+		t.Fatalf("expected PostCreate to be called")
 	}
 	if ensureCalls != 2 {
 		t.Fatalf("expected ensure to be called twice (create & post-read), got %d", ensureCalls)
@@ -738,7 +738,7 @@ func TestCRUDRunner_PostCreateRead_Error_NoMapSet(t *testing.T) {
 			mapCalls++
 			return nil
 		},
-		PostCreateRead: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
+		PostCreate: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			return nil, testhelpers.MkRS(500, nil, "post-read err"), errors.New("post-read failed")
 		},
 	}
@@ -782,7 +782,7 @@ func TestCRUDRunner_PostCreateRead_Maps_InvalidModel_ErrorPropagates(t *testing.
 			d.AddError("map error", "invalid api model")
 			return d
 		},
-		PostCreateRead: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
+		PostCreate: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			return &models.IssueTypeScheme{}, testhelpers.MkRS(200, nil, ""), nil
 		},
 		ExtractID: func(st *workTypeResourceModel) string { return st.ID.ValueString() },
@@ -917,73 +917,6 @@ func TestCRUDRunner_Read_MapError_And_Update_SetStateError(t *testing.T) {
 	}
 }
 
-func TestCRUDRunner_DoImport_EdgeCases(t *testing.T) {
-	ctx := context.Background()
-	var diags diag.Diagnostics
-
-	// mapToState returns error
-	d1 := DoImport[workTypeResourceModel, *models.IssueTypeScheme](
-		ctx,
-		"id",
-		func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
-			return &models.IssueTypeScheme{ID: id}, testhelpers.MkRS(200, nil, ""), nil
-		},
-		func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.AddError("map", "fail")
-			return d
-		},
-		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
-			t.Fatalf("setState should not be called on map error")
-			return nil
-		},
-		makeEnsure(&diags),
-	)
-	if !d1.HasError() {
-		t.Fatalf("expected diagnostics from mapToState error during import")
-	}
-
-	// apiRead 200 but api nil, mapper handles with diagnostics
-	d2 := DoImport[workTypeResourceModel, *models.IssueTypeScheme](
-		ctx,
-		"id",
-		func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
-			return nil, testhelpers.MkRS(200, nil, ""), nil
-		},
-		func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) diag.Diagnostics {
-			var d diag.Diagnostics
-			d.AddError("map", "nil api")
-			return d
-		},
-		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics {
-			t.Fatalf("setState should not be called on map error")
-			return nil
-		},
-		makeEnsure(&diags),
-	)
-	if !d2.HasError() {
-		t.Fatalf("expected diagnostics when mapper handles nil api during import")
-	}
-
-	// apiRead err/500
-	diags = diag.Diagnostics{}
-	_ = DoImport[workTypeResourceModel, *models.IssueTypeScheme](
-		ctx,
-		"id",
-		func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
-			return nil, testhelpers.MkRS(500, nil, ""), errors.New("fail")
-		},
-		func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) diag.Diagnostics {
-			return nil
-		},
-		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics { return nil },
-		makeEnsure(&diags),
-	)
-	if !diags.HasError() {
-		t.Fatalf("expected diagnostics from ensure on import read failure")
-	}
-}
-
 func TestCRUDRunner_EnsureActionStrings_AreCorrect(t *testing.T) {
 	ctx := context.Background()
 	actions := []string{}
@@ -1015,7 +948,7 @@ func TestCRUDRunner_EnsureActionStrings_AreCorrect(t *testing.T) {
 			st.ID = types.StringValue(api.ID)
 			return nil
 		},
-		PostCreateRead: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
+		PostCreate: func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
 			return &models.IssueTypeScheme{ID: "full"}, testhelpers.MkRS(200, nil, ""), nil
 		},
 	}
@@ -1036,14 +969,14 @@ func TestCRUDRunner_EnsureActionStrings_AreCorrect(t *testing.T) {
 	}, ensure)
 
 	// DoImport with an always-OK ensure
-	_ = DoImport[workTypeResourceModel, *models.IssueTypeScheme](ctx, "id", func(ctx context.Context, id string) (*models.IssueTypeScheme, *models.ResponseScheme, error) {
-		return &models.IssueTypeScheme{ID: id}, testhelpers.MkRS(200, nil, ""), nil
-	}, func(ctx context.Context, api *models.IssueTypeScheme, st *workTypeResourceModel) diag.Diagnostics {
-		st.ID = types.StringValue(api.ID)
-		return nil
-	}, func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics { return nil }, ensure)
+	_ = r.DoImport(
+		ctx,
+		"id",
+		func(ctx context.Context, src *workTypeResourceModel) diag.Diagnostics { return nil },
+		ensure,
+	)
 
-	expected := []string{"create resource", "read resource (post-create)", "read resource", "update resource", "delete resource", "read imported resource"}
+	expected := []string{"create resource", "post-create hook", "read resource", "update resource", "delete resource", "read imported resource"}
 	if len(actions) != len(expected) {
 		t.Fatalf("unexpected number of actions: got %d want %d; actions=%v", len(actions), len(expected), actions)
 	}

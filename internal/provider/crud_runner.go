@@ -46,9 +46,9 @@ type ExtractIDFunc[TState StateConstraint] func(st *TState) string
 // Return diagnostics when mapping encounters unexpected values or schema mismatches.
 type MapToStateFunc[TState StateConstraint, TAPI APIConstraint] func(ctx context.Context, api TAPI, st *TState) diag.Diagnostics
 
-// PostCreateReadFunc is an optional extra step after Create to fetch the full TAPI model.
+// PostAPIHook is an optional extra step after Create to fetch the full TAPI model.
 // Use this when Create returns a partial object and a subsequent Get is needed.
-type PostCreateReadFunc[TState StateConstraint, TAPI APIConstraint] func(ctx context.Context, api TAPI, st *TState) (apiOut TAPI, apiResp *models.ResponseScheme, err error)
+type PostAPIHook[TState StateConstraint, TAPI APIConstraint] func(ctx context.Context, api TAPI, st *TState) (apiOut TAPI, apiResp *models.ResponseScheme, err error)
 
 // Generic type constraints restricted to available provider types.
 //
@@ -124,7 +124,9 @@ type CRUDHooks[TState StateConstraint, TPayload PayloadConstraint, TAPI APIConst
 	MapToState MapToStateFunc[TState, TAPI]
 
 	// Optional hook for Create flows that need a follow-up read
-	PostCreateRead PostCreateReadFunc[TState, TAPI]
+	PostCreate PostAPIHook[TState, TAPI]
+	PostRead   PostAPIHook[TState, TAPI]
+	PostUpdate PostAPIHook[TState, TAPI]
 
 	// Per-operation status options
 	AcceptableCreateStatuses []int
@@ -155,18 +157,20 @@ func NewCRUDRunner[TState StateConstraint, TPayload PayloadConstraint, TAPI APIC
 	return CRUDRunner[TState, TPayload, TAPI]{hooks: hooks}
 }
 
-// postCreateReadIfNeeded performs the optional post-create read and ensure evaluation.
-func (r CRUDRunner[TState, TPayload, TAPI]) postCreateReadIfNeeded(
+// runPostHook runs an optional post-API hook (create/read/update) with shared ensure handling.
+func (r CRUDRunner[TState, TPayload, TAPI]) runPostHook(
 	ctx context.Context,
+	label string,
+	hook PostAPIHook[TState, TAPI],
 	api TAPI,
 	st *TState,
 	ensure func(ctx context.Context, action string, resp *models.ResponseScheme, err error, opts *EnsureSuccessOrDiagOptions) bool,
 ) (TAPI, bool) {
-	if r.hooks.PostCreateRead == nil {
+	if hook == nil {
 		return api, true
 	}
-	api2, rs, err := r.hooks.PostCreateRead(ctx, api, st)
-	if !ensure(ctx, "read resource (post-create)", rs, err, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
+	api2, rs, err := hook(ctx, api, st)
+	if !ensure(ctx, label, rs, err, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
 		var zero TAPI
 		return zero, false
 	}
@@ -260,7 +264,7 @@ func (r CRUDRunner[TState, TPayload, TAPI]) handleRead404(
 // 1) getPlan: Read the Terraform planned state into TState.
 // 2) BuildPayload: Build the API payload (TPayload) from TState.
 // 3) APICreate: Call the service to create the resource.
-// 4) PostCreateRead (optional): Fetch the full model if Create returns a partial object.
+// 4) PostCreate (optional): Fetch the full model if Create returns a partial object.
 // 5) MapToState: Map the API model (TAPI) back into TState.
 // 6) setState: Persist the final state back to Terraform.
 //
@@ -295,7 +299,7 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoCreate(
 	}
 
 	// 4) Optional post-create read
-	api, ok := r.postCreateReadIfNeeded(ctx, api, &st, ensure)
+	api, ok := r.runPostHook(ctx, "post-create hook", r.hooks.PostCreate, api, &st, ensure)
 	if !ok {
 		return diags
 	}
@@ -339,7 +343,13 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoRead(
 		return diags
 	}
 
-	// 3) Map and set state
+	// 3) Post-read hook
+	api, ok := r.runPostHook(ctx, "post-read hook", r.hooks.PostRead, api, &st, ensure)
+	if !ok {
+		return diags
+	}
+
+	// 4) Map and set state
 	mapped := r.mapAndSetState(ctx, api, &st, setState)
 	diags.Append(mapped...)
 	return diags
@@ -382,7 +392,13 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoUpdate(
 		return diags
 	}
 
-	// 4) Map and set state
+	// 4) Post-update hook
+	api, ok := r.runPostHook(ctx, "post-update hook", r.hooks.PostUpdate, api, &st, ensure)
+	if !ok {
+		return diags
+	}
+
+	// 5) Map and set state
 	mapped := r.mapAndSetState(ctx, api, &st, setState)
 	diags.Append(mapped...)
 	return diags
@@ -420,29 +436,33 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoDelete(
 // DoImport mirrors Read using an arbitrary import identifier.
 //
 // Steps
-// - apiRead fetches the remote model using the import ID.
-// - mapToState converts the API model into Terraform state.
+// - APIRead fetches the remote model using the import ID.
+// - MapToState converts the API model into Terraform state.
 // - setState persists the state.
 //
 // Guidance
 // - Pass ensureWith(&response.Diagnostics) for ensure.
 // - Reuse your resource’s MapToState hook implementation for consistency.
-func DoImport[TState StateConstraint, TAPI APIConstraint](
+func (r CRUDRunner[TState, TPayload, TAPI]) DoImport(
 	ctx context.Context,
 	id string,
-	apiRead func(ctx context.Context, id string) (api TAPI, resp *models.ResponseScheme, err error),
-	mapToState func(ctx context.Context, api TAPI, st *TState) diag.Diagnostics,
 	setState func(ctx context.Context, src *TState) diag.Diagnostics,
 	ensure func(ctx context.Context, action string, resp *models.ResponseScheme, err error, opts *EnsureSuccessOrDiagOptions) bool,
 ) diag.Diagnostics {
 	var diags diag.Diagnostics
 	var st TState
 
-	api, rs, err := apiRead(ctx, id)
+	api, rs, err := r.hooks.APIRead(ctx, id)
 	if !ensure(ctx, "read imported resource", rs, err, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
 		return diags
 	}
-	diags.Append(mapToState(ctx, api, &st)...)
+
+	api, ok := r.runPostHook(ctx, "post-read on import hook", r.hooks.PostRead, api, &st, ensure)
+	if !ok {
+		return diags
+	}
+
+	diags.Append(r.hooks.MapToState(ctx, api, &st)...)
 	if diags.HasError() {
 		return diags
 	}

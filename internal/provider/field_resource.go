@@ -39,6 +39,7 @@ type fieldResource struct {
 	ServiceClient
 	fieldService      jira.FieldConnector
 	fieldTrashService jira.FieldTrashConnector
+	crudRunner        CRUDRunner[fieldResourceModel, *models.CustomFieldScheme, *models.IssueFieldScheme]
 }
 
 // Metadata sets the type name for the resource using the provider's type name concatenated with "_field".
@@ -131,8 +132,7 @@ func (r *fieldResource) Create(ctx context.Context, req resource.CreateRequest, 
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Create)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoCreate(
+	diags := r.crudRunner.DoCreate(
 		ctx,
 		func(ctx context.Context, dst *fieldResourceModel) diag.Diagnostics { return req.Plan.Get(ctx, dst) },
 		func(ctx context.Context, src *fieldResourceModel) diag.Diagnostics { return resp.State.Set(ctx, src) },
@@ -175,8 +175,7 @@ func (r *fieldResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoRead(
+	diags := r.crudRunner.DoRead(
 		ctx,
 		func(ctx context.Context, dst *fieldResourceModel) diag.Diagnostics { return req.State.Get(ctx, dst) },
 		func(ctx context.Context, src *fieldResourceModel) diag.Diagnostics { return resp.State.Set(ctx, src) },
@@ -215,8 +214,7 @@ func (r *fieldResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Update)
 	defer cancel()
 
-	runner := NewCRUDRunner(r.hooks())
-	diags := runner.DoUpdate(
+	diags := r.crudRunner.DoUpdate(
 		ctx,
 		func(ctx context.Context, dst *fieldResourceModel) diag.Diagnostics { return req.Plan.Get(ctx, dst) },
 		func(ctx context.Context, src *fieldResourceModel) diag.Diagnostics { return resp.State.Set(ctx, src) },
@@ -280,13 +278,9 @@ func (r *fieldResource) ImportState(ctx context.Context, request resource.Import
 	ctx, cancel := withTimeout(ctx, r.providerTimeouts.Read)
 	defer cancel()
 
-	diags := DoImport[fieldResourceModel, *models.IssueFieldScheme](
+	diags := r.crudRunner.DoImport(
 		ctx,
 		request.ID,
-		r.lookupFieldByID,
-		func(ctx context.Context, api *models.IssueFieldScheme, st *fieldResourceModel) diag.Diagnostics {
-			return st.TransformToState(ctx, api)
-		},
 		func(ctx context.Context, src *fieldResourceModel) diag.Diagnostics {
 			return response.State.Set(ctx, src)
 		},
