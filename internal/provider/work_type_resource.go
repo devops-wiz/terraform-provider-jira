@@ -55,6 +55,7 @@ func (r *workTypeResource) Configure(_ context.Context, req resource.ConfigureRe
 
 	r.client = provider.client
 	r.typeService = provider.client.Issue.Type
+	r.crudRunner = NewCRUDRunner(r.hooks())
 	r.providerTimeouts = provider.providerTimeouts
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // _ is used to enforce that fieldResource implements the resource.Resource interface at compile time.
@@ -66,23 +67,19 @@ func (r *fieldResource) Configure(_ context.Context, req resource.ConfigureReque
 	r.fieldService = provider.client.Issue.Field
 	r.fieldTrashService = provider.client.Issue.Field.Trash
 	r.providerTimeouts = provider.providerTimeouts
+	r.crudRunner = NewCRUDRunner(r.hooks())
 }
 
 // hooks wires fieldResource to the generic CRUD runner.
 func (r *fieldResource) hooks() CRUDHooks[fieldResourceModel, *models.CustomFieldScheme, *models.IssueFieldScheme] {
 	return CRUDHooks[fieldResourceModel, *models.CustomFieldScheme, *models.IssueFieldScheme]{
-		BuildPayload: func(ctx context.Context, st *fieldResourceModel) (*models.CustomFieldScheme, diag.Diagnostics) {
-			return st.GetAPIPayload(ctx)
-		},
-		APICreate: r.fieldService.Create,
-		APIRead:   r.lookupFieldByID,
-		APIUpdate: r.updateField,
-		APIDelete: r.deleteField,
-		ExtractID: func(st *fieldResourceModel) string { return st.GetID() },
-		MapToState: func(ctx context.Context, api *models.IssueFieldScheme, st *fieldResourceModel) diag.Diagnostics {
-			return st.TransformToState(ctx, api)
-		},
-		// Status handling uses defaults; no special overrides required for fields.
+		BuildPayload: r.buildFieldPayload,
+		APICreate:    r.fieldService.Create,
+		APIRead:      r.lookupFieldByID,
+		APIUpdate:    r.updateField,
+		APIDelete:    r.deleteField,
+		ExtractID:    func(st *fieldResourceModel) string { return st.ID.ValueString() },
+		MapToState:   r.mapFieldToState,
 	}
 }
 
@@ -258,10 +255,9 @@ func (r *fieldResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		}
 
 	} else {
-		runner := NewCRUDRunner(r.hooks())
 
 		resp.Diagnostics.Append(
-			runner.DoDelete(
+			r.crudRunner.DoDelete(
 				ctx,
 				func(ctx context.Context, dst *fieldResourceModel) diag.Diagnostics {
 					return req.State.Get(ctx, dst)
@@ -287,4 +283,50 @@ func (r *fieldResource) ImportState(ctx context.Context, request resource.Import
 		ensureWith(&response.Diagnostics),
 	)
 	response.Diagnostics.Append(diags...)
+}
+
+// mapFieldToState maps data from the Jira API issue field scheme to the internal state representation for the resource.
+func (r *fieldResource) mapFieldToState(_ context.Context, apiModel *models.IssueFieldScheme, st *fieldResourceModel) diag.Diagnostics {
+	if apiModel == nil {
+		return diag.Diagnostics{diag.NewErrorDiagnostic("Empty API model", "The Jira API returned no field payload to map into state.")}
+	}
+
+	newState := fieldResourceModel{
+		ID:             types.StringValue(apiModel.ID),
+		Name:           types.StringValue(apiModel.Name),
+		FieldType:      types.StringValue(constants.GetFieldTypeShort(apiModel.Schema.Custom)),
+		Description:    st.Description,
+		TrashOnDestroy: st.TrashOnDestroy,
+	}
+	if apiModel.Description != "" {
+		newState.Description = types.StringValue(apiModel.Description)
+	}
+	*st = newState
+	return nil
+}
+
+// buildFieldPayload constructs a CustomFieldScheme payload based on the provided fieldResourceModel and validates field type.
+func (r *fieldResource) buildFieldPayload(_ context.Context, st *fieldResourceModel) (createPayload *models.CustomFieldScheme, diags diag.Diagnostics) {
+	if mapVal, ok := constants.FieldTypesMap[st.FieldType.ValueString()]; ok {
+		createPayload = &models.CustomFieldScheme{
+			Name:        st.Name.ValueString(),
+			Description: st.Description.ValueString(),
+			FieldType:   mapVal.Value,
+			SearcherKey: mapVal.SearcherKey,
+		}
+		return createPayload, diags
+	} else {
+		diags = diag.Diagnostics{}
+		diags.AddAttributeError(path.Root("field_type"), "Invalid Field Type", fmt.Sprintf("Field type: %s is not valid. Valid types include:\n%s", st.FieldType.ValueString(), strings.Join(constants.FieldTypeKeys, "\n")))
+		return createPayload, diags
+	}
+}
+
+// fieldResourceModel represents the Terraform schema model for jira_field.
+type fieldResourceModel struct {
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	FieldType      types.String `tfsdk:"field_type"`
+	TrashOnDestroy types.Bool   `tfsdk:"trash_on_destroy"`
 }
