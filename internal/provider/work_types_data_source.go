@@ -198,7 +198,8 @@ func (d *workTypesDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return issueTypes, diags
 	}
 
-	objMap, mapDiags := DoListToMap[*models.IssueTypeScheme, workTypeResourceModel](ctx, ListHooks[*models.IssueTypeScheme, workTypeResourceModel]{
+	var runner CRUDRunner[workTypeResourceModel, *models.IssueTypePayloadScheme, *models.IssueTypeScheme]
+	objMap, mapDiags := runner.DoListIssueTypes(ctx, ListHooks[*models.IssueTypeScheme, workTypeResourceModel]{
 		List: list,
 		Filter: func(ctx context.Context, it *models.IssueTypeScheme) bool {
 			if len(idFilter) > 0 {

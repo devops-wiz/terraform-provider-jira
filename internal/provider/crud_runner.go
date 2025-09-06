@@ -5,8 +5,10 @@ package provider
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 )
 
@@ -151,6 +153,63 @@ type CRUDRunner[TState StateConstraint, TPayload PayloadConstraint, TAPI APICons
 	hooks CRUDHooks[TState, TPayload, TAPI]
 }
 
+// -----------------------------
+// List/Search generic contracts
+// -----------------------------
+
+// ListFunc lists API items; may include internal pagination.
+// Prefer ListPage for server-side pagination when available.
+// Kept for compatibility with data sources and tests.
+// TAPIList is independent from TAPI of CRUDRunner and constrained by APIListConstraint.
+type ListFunc[TAPIList APIListConstraint] func(ctx context.Context) ([]TAPIList, diag.Diagnostics)
+
+// FilterFunc filters an API item; return true to keep.
+type FilterFunc[TAPIList APIListConstraint] func(ctx context.Context, item TAPIList) bool
+
+// KeyOfFunc returns a stable key for an item (e.g., ID as string).
+type KeyOfFunc[TAPIList APIListConstraint] func(item TAPIList) string
+
+// MapToOutFunc maps an API item to the Terraform object model.
+type MapToOutFunc[TAPIList APIListConstraint, TOut OutModelConstraint] func(ctx context.Context, item TAPIList) (TOut, diag.Diagnostics)
+
+// AttrTypesFunc returns the attribute types for TOut’s ObjectType; used by callers when encoding.
+type AttrTypesFunc func() map[string]attr.Type
+
+// ListPageFunc pages through list results.
+// startAt: zero-based offset, max: desired page size.
+// Return items, whether this is the last page, and diagnostics.
+type ListPageFunc[TAPIList APIListConstraint] func(ctx context.Context, startAt, max int) (items []TAPIList, isLast bool, d diag.Diagnostics)
+
+// APIListConstraint enumerates API models that appear in lists.
+type APIListConstraint interface {
+	*models.ProjectScheme | *models.ProjectCategoryScheme | *models.IssueTypeScheme
+}
+
+// OutModelConstraint enumerates Terraform object models used as list outputs.
+type OutModelConstraint interface {
+	projectResourceModel | projectCategoryResourceModel | workTypeResourceModel
+}
+
+// ListHooks defines list-to-map helpers for data sources and utilities.
+// TAPIList: API model per item.
+// TOut: Terraform object model per item.
+type ListHooks[TAPIList APIListConstraint, TOut OutModelConstraint] struct {
+	List      ListFunc[TAPIList]
+	ListPage  ListPageFunc[TAPIList]
+	Filter    FilterFunc[TAPIList]
+	KeyOf     KeyOfFunc[TAPIList]
+	MapToOut  MapToOutFunc[TAPIList, TOut]
+	AttrTypes AttrTypesFunc
+}
+
+// ListOptions configures DoListToMapWithLimit behavior.
+type ListOptions struct {
+	MaxItems       int
+	WarnThreshold  int
+	PreallocCap    int
+	RespectContext bool
+}
+
 // NewCRUDRunner constructs a CRUDRunner bound to the provided hooks.
 // Typical usage: runner := NewCRUDRunner(r.hooks())
 func NewCRUDRunner[TState StateConstraint, TPayload PayloadConstraint, TAPI APIConstraint](hooks CRUDHooks[TState, TPayload, TAPI]) CRUDRunner[TState, TPayload, TAPI] {
@@ -280,6 +339,12 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoCreate(
 	var diags diag.Diagnostics
 	var st TState
 
+	// Optional Create support per hooks
+	if r.hooks.APICreate == nil || r.hooks.BuildPayload == nil {
+		diags.AddError("create unsupported", "This resource does not support create operation.")
+		return diags
+	}
+
 	// 1) Read planned state
 	if d := getPlan(ctx, &st); d.HasError() {
 		return d
@@ -328,6 +393,12 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoRead(
 	var diags diag.Diagnostics
 	var st TState
 
+	// Required hooks for read/import semantics
+	if r.hooks.APIRead == nil || r.hooks.ExtractID == nil || r.hooks.MapToState == nil {
+		diags.AddError("read unsupported", "This resource does not support read operation.")
+		return diags
+	}
+
 	// 1) Read current state (for ID)
 	if d := getState(ctx, &st); d.HasError() {
 		return d
@@ -372,6 +443,12 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoUpdate(
 ) diag.Diagnostics {
 	var diags diag.Diagnostics
 	var st TState
+
+	// Optional Update support per hooks
+	if r.hooks.APIUpdate == nil || r.hooks.BuildPayload == nil || r.hooks.ExtractID == nil {
+		diags.AddError("update unsupported", "This resource does not support update operation.")
+		return diags
+	}
 
 	// 1) Read planned state (for ID)
 	if d := getPlan(ctx, &st); d.HasError() {
@@ -419,6 +496,12 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoDelete(
 	var diags diag.Diagnostics
 	var st TState
 
+	// Optional Delete support per hooks
+	if r.hooks.APIDelete == nil || r.hooks.ExtractID == nil {
+		diags.AddError("delete unsupported", "This resource does not support delete operation.")
+		return diags
+	}
+
 	// 1) Read current state (for ID)
 	if d := getState(ctx, &st); d.HasError() {
 		return d
@@ -452,6 +535,12 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoImport(
 	var diags diag.Diagnostics
 	var st TState
 
+	// Optional Import support per hooks
+	if r.hooks.APIRead == nil || r.hooks.MapToState == nil {
+		diags.AddError("import unsupported", "This resource does not support import operation.")
+		return diags
+	}
+
 	api, rs, err := r.hooks.APIRead(ctx, id)
 	if !ensure(ctx, "read imported resource", rs, err, &EnsureSuccessOrDiagOptions{IncludeBodySnippet: true}) {
 		return diags
@@ -468,4 +557,189 @@ func (r CRUDRunner[TState, TPayload, TAPI]) DoImport(
 	}
 	diags.Append(setState(ctx, &st)...)
 	return diags
+}
+
+// doListToMapCore is the generic implementation backing typed CRUDRunner list methods.
+func doListToMapCore[TAPIList APIListConstraint, TOut OutModelConstraint](
+	ctx context.Context,
+	h ListHooks[TAPIList, TOut],
+	opts ListOptions,
+) (map[string]TOut, diag.Diagnostics) {
+	const (
+		pageSizeDefault  = 200
+		checkCancelEvery = 1000
+	)
+	var diags diag.Diagnostics
+
+	capFor := func(total int) int {
+		capHint := total
+		if opts.PreallocCap > 0 && (capHint == 0 || opts.PreallocCap < capHint) {
+			capHint = opts.PreallocCap
+		}
+		if opts.MaxItems > 0 && (capHint == 0 || opts.MaxItems < capHint) {
+			capHint = opts.MaxItems
+		}
+		if capHint < 0 {
+			capHint = 0
+		}
+		return capHint
+	}
+
+	warnedThreshold := false
+	warnCanceled := func(reason string) { diags.AddWarning("listing canceled", reason) }
+	warnThreshold := func(count int) {
+		if !warnedThreshold {
+			warnedThreshold = true
+			diags.AddWarning("large result set", "number of items kept reached threshold: "+strconv.Itoa(count))
+		}
+	}
+	warnCapped := func(max int) {
+		diags.AddWarning("result capped", "maximum items reached; result truncated at "+strconv.Itoa(max))
+	}
+
+	kept := 0
+	processed := 0
+
+	processItems := func(items []TAPIList, result map[string]TOut) bool {
+		for _, it := range items {
+			processed++
+			if opts.RespectContext && processed%checkCancelEvery == 0 {
+				select {
+				case <-ctx.Done():
+					warnCanceled("context canceled or deadline exceeded during listing; returning partial results")
+					return false
+				default:
+				}
+			}
+			if h.Filter != nil && !h.Filter(ctx, it) {
+				continue
+			}
+			k := h.KeyOf(it)
+			obj, d2 := h.MapToOut(ctx, it)
+			diags.Append(d2...)
+			if diags.HasError() {
+				return false
+			}
+			result[k] = obj
+			kept++
+			if opts.WarnThreshold > 0 && kept >= opts.WarnThreshold {
+				warnThreshold(kept)
+			}
+			if opts.MaxItems > 0 && kept >= opts.MaxItems {
+				warnCapped(opts.MaxItems)
+				return false
+			}
+		}
+		return true
+	}
+
+	if h.ListPage == nil {
+		items, d := h.List(ctx)
+		diags.Append(d...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		result := make(map[string]TOut, capFor(len(items)))
+		cont := processItems(items, result)
+		if diags.HasError() {
+			return nil, diags
+		}
+		if !cont {
+			return result, diags
+		}
+		return result, diags
+	}
+
+	startAt := 0
+	max := pageSizeDefault
+	if opts.MaxItems > 0 && opts.MaxItems < max {
+		max = opts.MaxItems
+	}
+	result := make(map[string]TOut, capFor(max))
+	for {
+		items, isLast, d := h.ListPage(ctx, startAt, max)
+		diags.Append(d...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		if len(items) == 0 {
+			if isLast {
+				break
+			}
+			// Received empty page but not marked as last; break to avoid infinite loop and misalignment
+			break
+		} else {
+			if !processItems(items, result) {
+				break
+			}
+			startAt += len(items)
+		}
+		if isLast {
+			break
+		}
+		if opts.MaxItems > 0 {
+			remaining := opts.MaxItems - kept
+			if remaining <= 0 {
+				break
+			}
+			if remaining < max {
+				max = remaining
+			}
+		}
+		if opts.RespectContext {
+			select {
+			case <-ctx.Done():
+				warnCanceled("context canceled or deadline exceeded during pagination; returning partial results")
+				return result, diags
+			default:
+			}
+		}
+	}
+	return result, diags
+}
+
+// Typed CRUDRunner list methods for current provider use cases.
+func (r CRUDRunner[TState, TPayload, TAPI]) DoListIssueTypes(
+	ctx context.Context,
+	h ListHooks[*models.IssueTypeScheme, workTypeResourceModel],
+) (map[string]workTypeResourceModel, diag.Diagnostics) {
+	return doListToMapCore(ctx, h, ListOptions{})
+}
+
+func (r CRUDRunner[TState, TPayload, TAPI]) DoListIssueTypesWithLimit(
+	ctx context.Context,
+	h ListHooks[*models.IssueTypeScheme, workTypeResourceModel],
+	opts ListOptions,
+) (map[string]workTypeResourceModel, diag.Diagnostics) {
+	return doListToMapCore(ctx, h, opts)
+}
+
+func (r CRUDRunner[TState, TPayload, TAPI]) DoListProjects(
+	ctx context.Context,
+	h ListHooks[*models.ProjectScheme, projectResourceModel],
+) (map[string]projectResourceModel, diag.Diagnostics) {
+	return doListToMapCore(ctx, h, ListOptions{})
+}
+
+func (r CRUDRunner[TState, TPayload, TAPI]) DoListProjectsWithLimit(
+	ctx context.Context,
+	h ListHooks[*models.ProjectScheme, projectResourceModel],
+	opts ListOptions,
+) (map[string]projectResourceModel, diag.Diagnostics) {
+	return doListToMapCore(ctx, h, opts)
+}
+
+func (r CRUDRunner[TState, TPayload, TAPI]) DoListProjectCategories(
+	ctx context.Context,
+	h ListHooks[*models.ProjectCategoryScheme, projectCategoryResourceModel],
+) (map[string]projectCategoryResourceModel, diag.Diagnostics) {
+	return doListToMapCore(ctx, h, ListOptions{})
+}
+
+func (r CRUDRunner[TState, TPayload, TAPI]) DoListProjectCategoriesWithLimit(
+	ctx context.Context,
+	h ListHooks[*models.ProjectCategoryScheme, projectCategoryResourceModel],
+	opts ListOptions,
+) (map[string]projectCategoryResourceModel, diag.Diagnostics) {
+	return doListToMapCore(ctx, h, opts)
 }

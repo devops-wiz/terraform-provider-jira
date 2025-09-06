@@ -41,3 +41,4 @@ http-client.private.env.json
 /docs-internal/openapi/swagger-v3.v3.json
 /.junie/
 /http/
+/.aiassistant/rules/rules.md
