@@ -689,7 +689,7 @@ func doListToMapCore[TAPIList APIListConstraint, TOut OutModelConstraint](
 			select {
 			case <-ctx.Done():
 				warnCanceled("context canceled or deadline exceeded during pagination; returning partial results")
-				break
+				return result, diags
 			default:
 			}
 		}
