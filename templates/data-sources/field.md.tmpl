@@ -1,0 +1,23 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderShortName}}"
+description: |-
+  {{.Description}}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{.Description}}
+
+Lookup a single Jira custom field by either its ID or its display name. Exactly one of `id` or `name` must be provided.
+
+## Example Usage
+
+### Lookup by ID
+
+{{tffile "examples/data-sources/jira_field/by_id/data-source.tf"}}
+
+### Lookup by Name
+
+{{tffile "examples/data-sources/jira_field/by_name/data-source.tf"}}
+
+{{.SchemaMarkdown}}

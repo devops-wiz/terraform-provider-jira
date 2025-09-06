@@ -314,6 +314,7 @@ func (j *JiraProvider) DataSources(_ context.Context) []func() datasource.DataSo
 		NewProjectDataSource,
 		NewProjectsDataSource,
 		NewProjectCategoriesDataSource,
+		NewFieldDataSource,
 	}
 }
 
