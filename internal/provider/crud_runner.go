@@ -666,7 +666,7 @@ func doListToMapCore[TAPIList APIListConstraint, TOut OutModelConstraint](
 			if isLast {
 				break
 			}
-			startAt += 0
+			startAt += 1 // Prevent infinite loop on empty non-final pages
 		} else {
 			if !processItems(items, result) {
 				break
