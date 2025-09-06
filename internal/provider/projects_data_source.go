@@ -190,7 +190,8 @@ func (d *projectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return all, diags
 	}
 
-	objMap, mapDiags := DoListToMap[*models.ProjectScheme, projectResourceModel](ctx, ListHooks[*models.ProjectScheme, projectResourceModel]{
+	var runner CRUDRunner[projectResourceModel, *models.ProjectPayloadScheme, *models.ProjectScheme]
+	objMap, mapDiags := runner.DoListProjects(ctx, ListHooks[*models.ProjectScheme, projectResourceModel]{
 		List: allFetcher,
 		KeyOf: func(p *models.ProjectScheme) string {
 			return p.ID

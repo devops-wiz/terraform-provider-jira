@@ -24,14 +24,3 @@ var (
 	_ ListHooks[*models.ProjectScheme, projectResourceModel]
 	_ ListHooks[*models.ProjectCategoryScheme, projectCategoryResourceModel]
 )
-
-// List functions instantiations
-var (
-	_ = DoListToMap[*models.IssueTypeScheme, workTypeResourceModel]
-	_ = DoListToMap[*models.ProjectScheme, projectResourceModel]
-	_ = DoListToMap[*models.ProjectCategoryScheme, projectCategoryResourceModel]
-
-	_ = DoListToMapWithLimit[*models.IssueTypeScheme, workTypeResourceModel]
-	_ = DoListToMapWithLimit[*models.ProjectScheme, projectResourceModel]
-	_ = DoListToMapWithLimit[*models.ProjectCategoryScheme, projectCategoryResourceModel]
-)

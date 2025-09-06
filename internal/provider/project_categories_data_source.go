@@ -163,7 +163,8 @@ func (d *projectCategoriesDataSource) Read(ctx context.Context, req datasource.R
 		return out, diags
 	}
 
-	objMap, mapDiags := DoListToMap[*models.ProjectCategoryScheme, projectCategoryResourceModel](ctx, ListHooks[*models.ProjectCategoryScheme, projectCategoryResourceModel]{
+	var runner CRUDRunner[projectCategoryResourceModel, *models.ProjectCategoryPayloadScheme, *models.ProjectCategoryScheme]
+	objMap, mapDiags := runner.DoListProjectCategories(ctx, ListHooks[*models.ProjectCategoryScheme, projectCategoryResourceModel]{
 		List: list,
 		Filter: func(ctx context.Context, c *models.ProjectCategoryScheme) bool {
 			if len(idFilter) > 0 {
