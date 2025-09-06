@@ -42,3 +42,5 @@ http-client.private.env.json
 /.junie/
 /http/
 /.aiassistant/rules/rules.md
+.env
+dist/
