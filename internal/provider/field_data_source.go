@@ -153,7 +153,7 @@ func (d *fieldDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		if field == nil {
 			continue
 		}
-		
+
 		if lookupByID {
 			if field.ID == lookupValue {
 				targetField = &struct {
