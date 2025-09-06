@@ -44,3 +44,4 @@ http-client.private.env.json
 /.aiassistant/rules/rules.md
 .env
 dist/
+terraform-provider-jira
