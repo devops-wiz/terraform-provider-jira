@@ -116,7 +116,7 @@ jobs:
       - run: go mod download
       - run: task test RACE=true COVER=true COVERPROFILE=coverage.out
       - name: Upload unit test coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: unit-coverage
           path: coverage.out
